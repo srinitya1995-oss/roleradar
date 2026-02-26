@@ -162,7 +162,7 @@ export default function Home() {
         {error && <div className="inbox-error">Error: {error}</div>}
         {data && !hasAny && (
           <p className="inbox-empty">
-            No jobs in the last 7 days. Run <code>npm run poll</code> to fetch new jobs.
+            No jobs yet. Run <code>npm run seed-top-companies</code>, then <code>npm run poll</code>. Open <Link href="/inbox">Inbox</Link> for bucketed view.
           </p>
         )}
         {data && hasAny && (

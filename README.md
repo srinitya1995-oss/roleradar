@@ -40,15 +40,13 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) (or the port shown) for the dashboard. Jobs are grouped by company; click a role to see connections and referral copy.
 
-### Agent (background job hunter)
+### Agent (search jobs + warm connections)
 
 The agent polls job sources on a schedule and pre-warms referral connections for high-fit jobs so they’re ready when you open a job page.
 
-```bash
-npm run agent
-```
+**One terminal (app + agent together):** `npm run dev:full` — runs the web app and the agent; agent searches jobs and warms connections every 30 min.
 
-Leave it running in a terminal, or run it as a real service (see [docs/AGENT.md](docs/AGENT.md)):
+**Or two terminals:** `npm run dev` and `npm run agent`. Leave the agent running, or run it as a real service (see [docs/AGENT.md](docs/AGENT.md)):
 
 - **PM2** (Node): `pm2 start npm --name roleradar-agent -- run agent`
 - **launchd** (macOS): use the plist in `docs/AGENT.md`

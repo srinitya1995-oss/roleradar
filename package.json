@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --hostname 127.0.0.1 --webpack",
+    "dev:full": "concurrently -n dev,agent -c blue,green \"npm run dev\" \"npm run agent\"",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
@@ -32,6 +33,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "concurrently": "^9.2.1",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "tsx": "^4.21.0",

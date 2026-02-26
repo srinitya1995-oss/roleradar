@@ -193,7 +193,7 @@ export default function InboxClient({
             )}
           </>
         ) : (
-          <>Agent: <strong>Not running</strong> · run <code>npm run agent</code> to poll 24/7</>
+          <>Agent: <strong>Not running</strong> · run <code>npm run agent</code> (or <code>npm run dev:full</code>) to search jobs and warm connections</>
         )}
       </p>
       <TierSection title="Apply now" jobs={data.top5 ?? []} />
@@ -202,9 +202,19 @@ export default function InboxClient({
       <TierSection title="Review" jobs={data.reject ?? []} />
       <TierSection title="Hidden" jobs={data.other ?? []} />
       {!hasAnyJobs && !loading && (
-        <p className="inbox-empty" style={{ marginTop: "1rem", color: "#666" }}>
-          No jobs yet. Run <code>npm run poll</code> or wait for the agent.
-        </p>
+        <section className="inbox-empty" style={{ marginTop: "1.5rem", padding: "1.25rem", background: "#f5f5f5", borderRadius: "8px", maxWidth: "32rem" }}>
+          <h2 style={{ marginTop: 0, fontSize: "1.1rem" }}>No jobs yet</h2>
+          <p style={{ margin: "0.5rem 0", color: "#444" }}>
+            Seed job sources, then fetch jobs. In the project root run:
+          </p>
+          <pre style={{ margin: "0.75rem 0", padding: "0.75rem", background: "#fff", borderRadius: "4px", overflow: "auto", fontSize: "0.9rem" }}>
+            npm run seed-top-companies{"\n"}
+            npm run poll
+          </pre>
+          <p style={{ margin: "0.5rem 0", color: "#666", fontSize: "0.95rem" }}>
+            Then refresh this page. To <strong>search jobs and warm connections automatically</strong>, run the agent: <code>npm run agent</code> (in another terminal) or <code>npm run dev:full</code> (app + agent together). For people recommendations, run <code>npm run seed-people</code>.
+          </p>
+        </section>
       )}
     </main>
   );

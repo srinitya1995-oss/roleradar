@@ -32,6 +32,7 @@ yarn-error.log*
 
 # agent heartbeat (used by app to show "Agent: Live")
 .agent-last-poll
+agent.log
 
 # local sqlite db (do not commit)
 roleradar.db

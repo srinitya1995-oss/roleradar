@@ -114,9 +114,9 @@ export default function JobDetailPage() {
 
   const loadJob = (refreshTargets = false) => {
     if (typeof id !== "string" || !id) return;
-    const url = refreshTargets ? `/api/jobs/${id}?refresh_targets=1` : `/api/jobs/${id}`;
+    const url = refreshTargets ? `/api/jobs/${id}?refresh_targets=1&t=${Date.now()}` : `/api/jobs/${id}`;
     if (refreshTargets) setRefreshing(true);
-    fetch(url)
+    fetch(url, refreshTargets ? { cache: "no-store" } : undefined)
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(r.statusText))))
       .then((data: {
         job: Job;
@@ -290,8 +290,9 @@ export default function JobDetailPage() {
               )}
               {referralTargets.length === 0 && eligibleForConnections && (
                 <p className="outreach-empty">
-                  {refreshing ? "Refreshing…" : "No targets yet. "}
-                  <button type="button" onClick={() => loadJob(true)} disabled={refreshing} className="copy-btn">Refresh targets</button>
+                  {refreshing ? "Refreshing…" : "No connection targets yet. "}
+                  <button type="button" onClick={() => loadJob(true)} disabled={refreshing} className="copy-btn">Find connections</button>
+                  <span style={{ marginLeft: "0.5rem", color: "#666", fontSize: "0.9rem" }}>Generates Recruiter, Hiring Manager, Team PM/Peer, High-Signal Connector.</span>
                 </p>
               )}
             </section>
