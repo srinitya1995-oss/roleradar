@@ -33,7 +33,7 @@ export function parseLocation(location: string | null | undefined): LocationPars
 }
 
 /**
- * Job is location-eligible if: (allowed city/state match) OR (remote-only and allow_remote).
+ * Job is location-eligible if: (allowed city/state match) OR (remote-only and (allow_remote OR "Remote" in allowed list)).
  * Hybrid with an allowed city is OK (substring match on raw).
  */
 export function locationEligible(
@@ -42,8 +42,12 @@ export function locationEligible(
   allowRemote: boolean
 ): boolean {
   const parsed = parseLocation(location);
-  if (!parsed.raw_location) return false;
-  if (parsed.is_remote_only) return allowRemote;
+  // Boards often omit location in the feed; allow so we don't drop those listings
+  if (!parsed.raw_location) return true;
+  if (parsed.is_remote_only) {
+    const allowedByList = allowedLocations.some((a) => a.trim().toLowerCase() && parsed.raw_location.toLowerCase().includes(a.trim().toLowerCase()));
+    return allowRemote || allowedByList;
+  }
   const lower = parsed.raw_location.toLowerCase();
   return allowedLocations.some((a) => a.trim().toLowerCase() && lower.includes(a.trim().toLowerCase()));
 }

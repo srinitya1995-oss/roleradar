@@ -167,7 +167,6 @@ export default function Home() {
     <>
       <Head>
         <title>Role Radar</title>
-        <link href="/_next/static/css/app/layout.css" rel="stylesheet" />
       </Head>
       <div className="dashboard-page">
         <header className="dashboard-header">

@@ -1,7 +1,8 @@
 /**
  * Seed people pool for outreach recommendations.
  * Run: npx tsx scripts/seed-people.ts
- * Add people for companies you have job sources for (e.g. Anthropic).
+ * These are SAMPLE contacts for demo only—names and LinkedIn URLs are not real.
+ * Replace with real people (same company as your job sources) for real recommendations.
  */
 import { db } from "../src/lib/db";
 
@@ -11,33 +12,34 @@ if (existing) {
   process.exit(0);
 }
 
+// Sample/demo contacts only—LinkedIn URLs are placeholders; replace with real people.
 const people = [
   {
-    name: "Alex Chen",
+    name: "Sample contact (Anthropic)",
     title: "Senior PM",
     company: "Anthropic",
-    linkedin_url: "https://www.linkedin.com/in/example-alex",
+    linkedin_url: null as string | null, // placeholder; add real LinkedIn URL for real contacts
     relationship_type: "Ex-Amazon",
     connection_status: "Not connected",
-    notes: null,
+    notes: "Demo contact—replace with real person",
   },
   {
-    name: "Jordan Lee",
+    name: "Sample contact 2 (Anthropic)",
     title: "Principal PM",
     company: "Anthropic",
-    linkedin_url: "https://www.linkedin.com/in/example-jordan",
+    linkedin_url: null,
     relationship_type: "Same team",
     connection_status: "Connected",
-    notes: null,
+    notes: "Demo contact—replace with real person",
   },
   {
-    name: "Sam Rivera",
+    name: "Sample contact 3 (Anthropic)",
     title: "Engineering Manager",
     company: "Anthropic",
-    linkedin_url: "https://www.linkedin.com/in/example-sam",
+    linkedin_url: null,
     relationship_type: "Adjacent org",
     connection_status: "Unknown",
-    notes: null,
+    notes: "Demo contact—replace with real person",
   },
 ];
 
@@ -50,5 +52,6 @@ for (const p of people) {
   insert.run(p.name, p.title, p.company, p.linkedin_url, p.relationship_type, p.connection_status, p.notes);
 }
 
-console.log(`Seeded ${people.length} people. Recommendations show on job detail; most relevant for Apply now / Strong fit / Near match jobs.`);
+console.log(`Seeded ${people.length} sample people (demo only—names/URLs are not real).`);
+console.log("Replace with real contacts at your target companies for real recommendations. People to connect only shows contacts at the same company as each job.");
 process.exit(0);

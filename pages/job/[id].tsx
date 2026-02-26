@@ -190,7 +190,6 @@ export default function JobDetailPage() {
     <>
       <Head>
         <title>Role Radar – {job.title ?? "Job"}</title>
-        <link href="/_next/static/css/app/layout.css" rel="stylesheet" />
       </Head>
       <div className="inbox-page" style={{ padding: "1.5rem", maxWidth: "56rem", margin: "0 auto" }}>
         <p style={{ marginBottom: "0.75rem" }}>
@@ -312,56 +311,63 @@ export default function JobDetailPage() {
               </section>
             )}
 
-            {recommendations.length > 0 && (
+            {(recommendations.length > 0 || (eligibleForConnections && job?.company)) && (
               <section className="outreach-section people-section">
                 <h2>People to connect & ask for referral</h2>
-                <p className="find-connections-copy">From your network: same company, Ex-Amazon, or profile match. Copy message and track status.</p>
-                <ul className="outreach-list">
-                  {recommendations.map((rec) => (
-                    <li key={rec.person.id} className="outreach-card">
-                      <div className="outreach-person">
-                        <strong>
-                          {rec.person.linkedin_url ? (
-                            <a href={rec.person.linkedin_url} target="_blank" rel="noopener noreferrer">
-                              {rec.person.name}
-                            </a>
-                          ) : (
-                            rec.person.name
-                          )}
-                        </strong>
-                        {rec.person.title && <span> · {rec.person.title}</span>}
-                        {rec.person.company && <span> · {rec.person.company}</span>}
-                        <div className="outreach-meta">
-                          {rec.person.relationship_type && <span className="rel-type">{rec.person.relationship_type}</span>}
-                          {rec.person.connection_status && <span className="conn-status">{rec.person.connection_status}</span>}
-                        </div>
-                      </div>
-                      <div className="outreach-message-preview">
-                        {rec.drafted_message.slice(0, 120)}
-                        {rec.drafted_message.length > 120 ? "…" : ""}
-                      </div>
-                      <div className="outreach-actions">
-                        <CopyButton text={rec.drafted_message} />
-                        <label className="outreach-status-label">
-                          Status{" "}
-                          <select
-                            value={rec.outreach_status}
-                            onChange={(e) => updateStatus(rec.person.id, e.target.value)}
-                            className="outreach-status-select"
-                          >
-                            {OUTREACH_OPTIONS.map((opt) => (
-                              <option key={opt} value={opt}>{opt}</option>
-                            ))}
-                          </select>
-                        </label>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
+                {recommendations.length > 0 ? (
+                  <>
+                    <p className="find-connections-copy">From your network at {job?.company}: copy message and track status.</p>
+                    {recommendations.some((rec) => !rec.person.linkedin_url || /example|placeholder/i.test(rec.person.linkedin_url ?? "")) && (
+                      <p className="sample-contacts-notice">These are sample/demo contacts—names and LinkedIn links are not real. Add real people at this company (e.g. via your own data or seed) to see real recommendations.</p>
+                    )}
+                    <ul className="outreach-list">
+                      {recommendations.map((rec) => (
+                        <li key={rec.person.id} className="outreach-card">
+                          <div className="outreach-person">
+                            <strong>
+                              {rec.person.linkedin_url ? (
+                                <a href={rec.person.linkedin_url} target="_blank" rel="noopener noreferrer">
+                                  {rec.person.name}
+                                </a>
+                              ) : (
+                                rec.person.name
+                              )}
+                            </strong>
+                            {rec.person.title && <span> · {rec.person.title}</span>}
+                            {rec.person.company && <span> · {rec.person.company}</span>}
+                            <div className="outreach-meta">
+                              {rec.person.relationship_type && <span className="rel-type">{rec.person.relationship_type}</span>}
+                              {rec.person.connection_status && <span className="conn-status">{rec.person.connection_status}</span>}
+                            </div>
+                          </div>
+                          <div className="outreach-message-preview">
+                            {rec.drafted_message.slice(0, 120)}
+                            {rec.drafted_message.length > 120 ? "…" : ""}
+                          </div>
+                          <div className="outreach-actions">
+                            <CopyButton text={rec.drafted_message} />
+                            <label className="outreach-status-label">
+                              Status{" "}
+                              <select
+                                value={rec.outreach_status}
+                                onChange={(e) => updateStatus(rec.person.id, e.target.value)}
+                                className="outreach-status-select"
+                              >
+                                {OUTREACH_OPTIONS.map((opt) => (
+                                  <option key={opt} value={opt}>{opt}</option>
+                                ))}
+                              </select>
+                            </label>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                ) : (
+                  <p className="find-connections-copy">No contacts at <strong>{job?.company}</strong> in your network. Use <strong>Find connections</strong> above to search LinkedIn for recruiters and hiring managers, or add people at this company via <code>seed-people</code>.</p>
+                )}
               </section>
             )}
-          </>
-        )}
       </div>
       <style jsx global>{`
         .inbox-page h1 { font-size: 1.25rem; margin-bottom: 0.5rem; }
@@ -377,6 +383,7 @@ export default function JobDetailPage() {
         .find-connections-section { margin-top: 1rem; }
         .find-connections-section h2 { font-size: 1.2rem; margin-bottom: 0.35rem; }
         .find-connections-copy { font-size: 0.9rem; color: #555; margin-bottom: 1rem; line-height: 1.4; }
+        .sample-contacts-notice { font-size: 0.875rem; color: #92400e; background: #fef3c7; border: 1px solid #f59e0b; border-radius: 6px; padding: 0.5rem 0.75rem; margin-bottom: 1rem; line-height: 1.4; }
         .refresh-targets-row { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; }
         .connection-status-badge { font-size: 0.8rem; color: #b45309; }
         .outreach-section h2 { font-size: 1.1rem; margin-bottom: 0.75rem; }

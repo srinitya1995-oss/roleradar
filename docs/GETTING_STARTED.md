@@ -55,7 +55,7 @@ The app creates the SQLite DB and tables on first use. To seed job sources (comp
 npm run seed-top-companies
 ```
 
-This adds/updates sources (e.g. Anthropic, Adobe, OpenAI, Uber). You can run `npm run seed-adobe`, `npm run seed-people`, etc. as needed (see `scripts/`).
+This adds/updates sources (e.g. Anthropic, Adobe, OpenAI, Uber). You can run `npm run seed-adobe`, `npm run seed-people`, etc. as needed (see `scripts/`). **Note:** `seed-people` and `seed-adobe` add **sample/demo contacts only** (names and LinkedIn URLs are not real). Replace with real people at your target companies for real "People to connect" recommendations.
 
 **Backfill existing jobs (scores + bucket):** If you have existing job rows without `final_fit_score` / `resume_match` / `bucket`, run once:
 

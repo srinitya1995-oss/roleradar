@@ -125,17 +125,18 @@ export function passesGate4(description: string | null | undefined): boolean {
 
 /**
  * Run all gates in order. Only if true should we compute score and store the job.
- * GATE 2 (seniority) enforced. GATE 3 applied by caller via locationEligible().
- * Pass allowGpm from settings.allow_gpm for GATE 1.
+ * GATE 2 (seniority) enforced unless allowJuniorPm. GATE 3 applied by caller via locationEligible().
+ * Pass allowGpm from settings.allow_gpm, allowJuniorPm from settings.allow_junior_pm.
  */
 export function passesTitleAndDescriptionGates(
   title: string | null | undefined,
   description: string | null | undefined,
-  allowGpm = false
+  allowGpm = false,
+  allowJuniorPm = false
 ): boolean {
   if (!passesGate0(title)) return false;
   if (!passesGate1(title, allowGpm)) return false;
-  if (!passesGate2(title)) return false;
+  if (!allowJuniorPm && !passesGate2(title)) return false;
   if (!passesGate4(description)) return false;
   return true;
 }

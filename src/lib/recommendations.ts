@@ -55,7 +55,12 @@ export function getRecommendationsForJob(jobId: number): OutreachTarget[] {
   const jobIdStr = job.external_id ?? String(jobId);
   const companyName = (job.company_name ?? "").trim().toLowerCase();
 
-  const people = db.prepare("SELECT id, name, title, company, linkedin_url, relationship_type, connection_status, notes FROM people").all() as PersonRow[];
+  // Only recommend people at the same company as the job (relevant for referrals)
+  const people = db.prepare(
+    "SELECT id, name, title, company, linkedin_url, relationship_type, connection_status, notes FROM people WHERE LOWER(TRIM(company)) = ?"
+  ).all(companyName) as PersonRow[];
+
+  if (people.length === 0) return [];
 
   const textForProfileMatch = (p: PersonRow) =>
     [p.title, p.company, p.notes].filter(Boolean).join(" ").toLowerCase();
@@ -65,14 +70,12 @@ export function getRecommendationsForJob(jobId: number): OutreachTarget[] {
   };
 
   const scored = people.map((p) => {
-    const companyMatch = companyName && (p.company ?? "").trim().toLowerCase() === companyName ? 1 : 0;
     const relRank = relationshipRank(p.relationship_type ?? null);
     const profileScore = profileAlignment(p);
-    return { person: p, companyMatch, profileScore, relRank };
+    return { person: p, profileScore, relRank };
   });
 
   scored.sort((a, b) => {
-    if (b.companyMatch !== a.companyMatch) return b.companyMatch - a.companyMatch;
     if (b.profileScore !== a.profileScore) return b.profileScore - a.profileScore;
     return a.relRank - b.relRank;
   });
@@ -106,6 +109,13 @@ export function getRecommendationsForJob(jobId: number): OutreachTarget[] {
 }
 
 export function getExistingRecommendations(jobId: number): OutreachTarget[] {
+  const job = db.prepare(`
+    SELECT s.company AS company_name FROM jobs j
+    LEFT JOIN job_sources s ON j.source_id = s.id WHERE j.id = ?
+  `).get(jobId) as { company_name: string | null } | undefined;
+  const jobCompany = (job?.company_name ?? "").trim().toLowerCase();
+  if (!jobCompany) return [];
+
   const rows = db.prepare(`
     SELECT jp.job_id, jp.person_id, jp.message_type, jp.drafted_message, jp.outreach_status
     FROM job_people jp
@@ -122,6 +132,8 @@ export function getExistingRecommendations(jobId: number): OutreachTarget[] {
   return rows.map((job_person) => {
     const person = personMap.get(job_person.person_id);
     if (!person) return null;
+    // Only show people at the same company as the job
+    if ((person.company ?? "").trim().toLowerCase() !== jobCompany) return null;
     return { person, job_person };
   }).filter((x): x is OutreachTarget => x != null);
 }

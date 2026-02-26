@@ -3,6 +3,13 @@
  * Gates: PM/PM-T/seniority + location (CA/Seattle; no remote-only unless allow_remote).
  * Store final_fit_score, resume_match, bucket (APPLY_NOW / STRONG_FIT / NEAR_MATCH / REVIEW / HIDE).
  */
+import path from "path";
+import { fileURLToPath } from "url";
+import dotenv from "dotenv";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.join(__dirname, "..", ".env") });
+
 import { db } from "../src/lib/db";
 import { parseGreenhouseBoard } from "../src/lib/parsers/greenhouse";
 import { parseLeverBoard } from "../src/lib/parsers/lever";
@@ -59,12 +66,16 @@ function sourceDue(source: JobSource): boolean {
 
 const updateLastPolled = db.prepare("UPDATE job_sources SET last_polled_at = datetime('now') WHERE id = ?");
 
-/** Run one poll cycle; exported for use by agent. V2: only polls sources that are due by tier (30min/2hr/daily). */
-export async function runPoll(): Promise<{ count: number; inserted: InsertedJob[] }> {
+/** Run one poll cycle; exported for use by agent. V2: only polls sources that are due by tier (30min/2hr/daily), unless force. */
+export async function runPoll(forceAll = false): Promise<{ count: number; inserted: InsertedJob[] }> {
   const allSources = db.prepare(
     "SELECT id, company, url, parser, company_tier, last_polled_at FROM job_sources WHERE enabled = 1"
   ).all() as JobSource[];
-  const sources = allSources.filter(sourceDue);
+  const sources = forceAll ? allSources : allSources.filter(sourceDue);
+  if (forceAll && allSources.length) console.log(`Force poll: running all ${allSources.length} enabled sources.`);
+  if (!sources.length) {
+    console.log("No sources due to poll (run with --force to poll all enabled sources).");
+  }
   let totalInserted = 0;
   const inserted: InsertedJob[] = [];
 
@@ -94,7 +105,7 @@ export async function runPoll(): Promise<{ count: number; inserted: InsertedJob[
           skippedLocation++;
           continue;
         }
-        if (!passesTitleAndDescriptionGates(title, description, settings.allow_gpm)) {
+        if (!passesTitleAndDescriptionGates(title, description, settings.allow_gpm, settings.allow_junior_pm)) {
           skippedGates++;
           continue;
         }
@@ -152,7 +163,8 @@ export async function runPoll(): Promise<{ count: number; inserted: InsertedJob[
 }
 
 async function main() {
-  const { count } = await runPoll();
+  const forceAll = process.argv.includes("--force");
+  const { count } = await runPoll(forceAll);
   console.log(`Total: ${count} new jobs.`);
   process.exit(0);
 }

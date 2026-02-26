@@ -22,10 +22,17 @@ export const defaultAllowedLocations: string[] = [
   "Los Angeles, CA",
   "Bellevue, WA",
   "Redmond, WA",
+  "Remote",
+  "New York",
+  "NYC",
+  "Boston",
+  "Austin",
+  "Denver",
 ];
 
 export const defaultAllowRemote = false;
 export const defaultAllowGpm = false;
+export const defaultAllowJuniorPm = false;
 export const defaultShowRejectBucket = true;
 export const defaultRejectCpiMinToShow = 5;
 export const defaultRejectCpiMaxToShow = 6;
@@ -39,6 +46,7 @@ export type Settings = {
   allowed_locations: string[];
   allow_remote: boolean;
   allow_gpm: boolean;
+  allow_junior_pm: boolean;
   show_reject_bucket: boolean;
   reject_cpi_min_to_show: number;
   reject_cpi_max_to_show: number;
@@ -51,6 +59,7 @@ type SettingsFile = Partial<{
   recency_days: number;
   allow_remote: boolean;
   allow_gpm: boolean;
+  allow_junior_pm: boolean;
   target_stale_days: number;
   prewarm_cap: number;
   max_targets_per_job: number;
@@ -99,6 +108,7 @@ export function getSettings(): Settings {
   const recency_days = envInt("RECENCY_DAYS") ?? file?.recency_days ?? defaultRecencyDays;
   const allow_remote = envBool("ALLOW_REMOTE") ?? file?.allow_remote ?? defaultAllowRemote;
   const allow_gpm = envBool("ALLOW_GPM") ?? file?.allow_gpm ?? defaultAllowGpm;
+  const allow_junior_pm = envBool("ALLOW_JUNIOR_PM") ?? file?.allow_junior_pm ?? defaultAllowJuniorPm;
   const target_stale_days = envInt("TARGET_STALE_DAYS") ?? file?.target_stale_days ?? defaultTargetStaleDays;
   const prewarm_cap = envInt("PREWARM_CAP") ?? file?.prewarm_cap ?? defaultPrewarmCap;
   const max_targets_per_job = envInt("MAX_TARGETS_PER_JOB") ?? file?.max_targets_per_job ?? defaultMaxTargetsPerJob;
@@ -109,6 +119,7 @@ export function getSettings(): Settings {
     allowed_locations: Array.isArray(allowed_locations) ? allowed_locations : defaultAllowedLocations,
     allow_remote: !!allow_remote,
     allow_gpm: !!allow_gpm,
+    allow_junior_pm: !!allow_junior_pm,
     show_reject_bucket: defaultShowRejectBucket,
     reject_cpi_min_to_show: defaultRejectCpiMinToShow,
     reject_cpi_max_to_show: defaultRejectCpiMaxToShow,
