@@ -5,7 +5,9 @@
 import fs from "fs";
 import path from "path";
 
-const HEARTBEAT_FILE = path.join(process.cwd(), ".agent-last-poll");
+const HEARTBEAT_FILE =
+  process.env.AGENT_HEARTBEAT_FILE ||
+  path.resolve(process.cwd(), ".agent-last-poll");
 const POLL_INTERVAL_MS = 30 * 60 * 1000;
 const LIVE_THRESHOLD_MS = 40 * 60 * 1000;
 

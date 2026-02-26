@@ -1,6 +1,6 @@
 # Role Radar — Full walkthrough
 
-**Quick start (see jobs + connections):** From project root run `npm run seed-top-companies`, then `npm run poll`. Then either: (A) `npm run dev:full` — runs the app and the agent in one terminal (agent searches jobs and warms connections every 30 min), or (B) two terminals: `npm run dev` and `npm run agent`. Open http://localhost:3000/inbox. Optionally: `npm run seed-people` for recommendations.
+**Quick start (see jobs + connections):** From project root run **`npm run setup`** (seeds sources + fetches jobs in one go). If you get **0 new jobs**, set **`ALLOW_REMOTE=true`** in `.env` and run **`npm run poll`** again (many boards list "Remote" only). Then either: (A) **`npm run dev:full`** — app + agent in one terminal (agent polls every 30 min), or (B) two terminals: **`npm run dev`** and **`npm run agent`**. Open http://localhost:3000/inbox. Optionally: **`npm run seed-people`** for recommendations.
 
 Step-by-step from clone to running app + agent + GitHub.
 

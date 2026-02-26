@@ -1,3 +1,5 @@
+import "dotenv/config";
+
 /**
  * RoleRadar agent: runs poll on a schedule (optional time window), then pre-warms
  * referral connections for high-fit jobs so they're ready when you open the job page.
@@ -23,7 +25,9 @@ import { runPoll } from "./poll";
 import { warmConnectionsForHighFitJobs } from "../src/lib/agent-warm";
 import { canSendEmail, sendJobsNotification } from "../src/lib/notify-email";
 
-const AGENT_HEARTBEAT_FILE = path.join(process.cwd(), ".agent-last-poll");
+const AGENT_HEARTBEAT_FILE =
+  process.env.AGENT_HEARTBEAT_FILE ||
+  path.resolve(process.cwd(), ".agent-last-poll");
 function writeHeartbeat(): void {
   try {
     fs.writeFileSync(AGENT_HEARTBEAT_FILE, new Date().toISOString(), "utf8");
@@ -55,6 +59,7 @@ function sleep(ms: number): Promise<void> {
 }
 
 async function main() {
+  writeHeartbeat(); // so app shows "Agent: Live" as soon as agent starts
   console.log("RoleRadar agent started.");
   console.log(`  Wake interval: ${POLL_INTERVAL_MS / 60000} min (per-source poll is tier-based: 30min / 2hr / daily)`);
   console.log(`  Time window: ${ALWAYS_POLL ? "24/7" : `${WINDOW_START}:00–${WINDOW_END}:00 local`}`);

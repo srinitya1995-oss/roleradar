@@ -8,8 +8,9 @@ End-to-end flow with every step so you can verify behavior.
 
 | Step | Command / action | What happens |
 |------|------------------|---------------|
-| 1.1 | `npm run seed-top-companies` | Inserts/updates `job_sources`: Anthropic (greenhouse), Adobe (workday), Airbnb (greenhouse), Uber (greenhouse), OpenAI (ashby). Each row: company, url, parser, enabled=1, company_tier (1=30min, 2=2hr, 3=daily). |
-| 1.2 | `npm run poll` (or agent does this) | For each **due** source (see 3.1), fetches jobs from URL via parser; for each **new** job (not in DB by source_id + external_id): applies location gate (locationEligible), title/description gate (passesTitleAndDescriptionGates); computes final_fit_score, resume_match, bucket; writes job row (and legacy cpi, tier). |
+| 1.1 | **`npm run setup`** (recommended) | Seeds job_sources (Anthropic, Adobe, Airbnb, Uber, OpenAI) **and** runs poll once. Prints: new jobs this run, total in DB. If 0 new: suggests setting `ALLOW_REMOTE=true` in .env (many boards list "Remote" only). |
+| 1.1b | Or: `npm run seed-top-companies` then `npm run poll` | Same effect as setup; poll fetches jobs. If you get 0 new jobs, set `ALLOW_REMOTE=true` in .env and run `npm run poll` again. |
+| 1.2 | Agent: `npm run agent` (or `npm run dev:full`) | Agent runs poll on a schedule (default every 30 min). **Leave it running** in a terminal so new jobs keep coming. Home page shows a banner when agent is not running. |
 | 1.3 | `npm run dev` or `npm run dev:full` | Next.js app on http://127.0.0.1:3000. `dev:full` also starts the agent in the same terminal (concurrently). |
 | 1.4 | (optional) `npm run seed-people` | Inserts people into `people`; job detail page uses these for "People to connect & ask for referral" (recommendations). |
 | 1.5 | (optional) `OPENAI_API_KEY` in `.env` | Job detail and agent use LLM for referral targets when eligible; otherwise heuristic only. |

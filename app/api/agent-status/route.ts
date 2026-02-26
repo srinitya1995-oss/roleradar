@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
 
-const HEARTBEAT_FILE = path.join(process.cwd(), ".agent-last-poll");
+const HEARTBEAT_FILE =
+  process.env.AGENT_HEARTBEAT_FILE ||
+  path.resolve(process.cwd(), ".agent-last-poll");
 const LIVE_THRESHOLD_MS = 40 * 60 * 1000; // 40 min (poll every 30)
 const POLL_INTERVAL_MS = 30 * 60 * 1000; // 30 min — match scripts/agent.ts default
 
