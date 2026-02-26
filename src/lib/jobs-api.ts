@@ -20,6 +20,7 @@ export type JobRow = {
   description: string | null;
   created_at: string | null;
   posted_at: string | null;
+  reposted_at: string | null;
   company: string | null;
   first_seen_at: string | null;
   final_fit_score: number | null;
@@ -49,17 +50,14 @@ export function getJobsPayload(): {
   jobsByCompany: { company: string; jobs: unknown[] }[];
 } {
   const settings = getSettings();
-  const recencyDays = Math.max(1, settings.recency_days);
+  // Jobs from past day (reposted_at/posted_at/first_seen_at/created_at)
   const rows = db.prepare(`
-  SELECT j.id, j.title, j.location, j.url, j.external_id, j.cpi, j.tier, j.description, j.created_at, j.posted_at, j.first_seen_at, j.final_fit_score, j.resume_match, j.bucket, s.company
+  SELECT j.id, j.title, j.location, j.url, j.external_id, j.cpi, j.tier, j.description, j.created_at, j.posted_at, j.reposted_at, j.first_seen_at, j.final_fit_score, j.resume_match, j.bucket, s.company
   FROM jobs j
   LEFT JOIN job_sources s ON j.source_id = s.id
-  WHERE (
-    (j.posted_at IS NOT NULL AND j.posted_at >= datetime('now', '-' || ? || ' days'))
-    OR (j.posted_at IS NULL AND COALESCE(j.first_seen_at, j.created_at) >= datetime('now', '-' || ? || ' days'))
-  )
-  ORDER BY COALESCE(j.posted_at, j.first_seen_at, j.created_at) DESC, j.final_fit_score DESC NULLS LAST, j.cpi DESC NULLS LAST, j.id DESC
-`).all(recencyDays, recencyDays) as JobRow[];
+  WHERE (COALESCE(j.reposted_at, j.posted_at, j.first_seen_at, j.created_at) >= datetime('now', '-1 days'))
+  ORDER BY COALESCE(j.reposted_at, j.posted_at, j.first_seen_at, j.created_at) DESC, j.final_fit_score DESC NULLS LAST, j.cpi DESC NULLS LAST, j.id DESC
+`).all() as JobRow[];
 
   const dedupeKey = (r: JobRow) => `${(r.company ?? "").trim().toLowerCase()}|${normalizeTitle(r.title)}`;
   const seen = new Set<string>();
@@ -150,7 +148,7 @@ export function getJobsPayload(): {
         cpi: r.cpi,
         tier: r.tier,
         company: r.company ?? null,
-        date_posted: r.posted_at ?? r.first_seen_at ?? r.created_at ?? null,
+        date_posted: r.reposted_at ?? r.posted_at ?? r.first_seen_at ?? r.created_at ?? null,
         match_label: matchLabel(r, resumeMatch, final_fit_score),
         profile_match_pct: resumeMatch,
         match_pct,
