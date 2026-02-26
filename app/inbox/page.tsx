@@ -70,7 +70,7 @@ function nextUpdateInMin(lastPollAt: string | null, pollIntervalMs: number): num
 }
 
 export default function InboxPage() {
-  const [data, setData] = useState<{ top5: Job[]; top20: Job[]; reject: Job[] } | null>(null);
+  const [data, setData] = useState<{ top5: Job[]; top20: Job[]; rejectedRelevantOnly?: Job[] } | null>(null);
   const [agentStatus, setAgentStatus] = useState<{
     live: boolean;
     lastPollAt: string | null;
@@ -81,11 +81,19 @@ export default function InboxPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/api/jobs")
+    const controller = new AbortController();
+    const t = setTimeout(() => controller.abort(), 15000);
+    fetch("/api/jobs", { signal: controller.signal })
       .then((r) => r.ok ? r.json() : Promise.reject(new Error(r.statusText)))
-      .then(setData)
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
+      .then((payload) => {
+        setData({
+          top5: payload.top5 ?? [],
+          top20: payload.top20 ?? [],
+          rejectedRelevantOnly: payload.rejectedRelevantOnly ?? [],
+        });
+      })
+      .catch((e) => setError(e.name === "AbortError" ? "Request timed out" : e.message))
+      .finally(() => { clearTimeout(t); setLoading(false); });
   }, []);
 
   useEffect(() => {
@@ -122,6 +130,8 @@ export default function InboxPage() {
           <>
             Agent: <strong>Live</strong>
             {" · "}
+            jobs from last run
+            {" · "}
             last poll {agentStatus.lastPollAt ? formatMinutesAgo(agentStatus.lastPollAt) : "—"}
             {nextMin !== null && (
               <> · next update in <strong>{nextMin} min</strong></>
@@ -131,9 +141,9 @@ export default function InboxPage() {
           <>Agent: <strong>Not running</strong> · run <code>npm run agent</code> to poll 24/7</>
         )}
       </p>
-      <TierSection title="Top 5%" jobs={data.top5} />
-      <TierSection title="Top 20%" jobs={data.top20} />
-      <TierSection title="Reject" jobs={data.reject} />
+      <TierSection title="Top 5%" jobs={data.top5 ?? []} />
+      <TierSection title="Top 20%" jobs={data.top20 ?? []} />
+      <TierSection title="Reject" jobs={data.rejectedRelevantOnly ?? []} />
     </main>
   );
 }

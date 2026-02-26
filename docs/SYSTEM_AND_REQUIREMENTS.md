@@ -54,7 +54,7 @@ flowchart TB
 3. **CPI** — multi-layer: Role Fit Score (0–5) + AI Depth Score (0–5), clamped 0–10. Tier: 9–10 Top 5%, 7–8 Top 20%, &lt;7 Reject.
 4. **Inbox** — reads `jobs` via GET /api/jobs; shows only jobs **added in the last 24 hours** (`created_at >= now - 24h`), **deduped** by (company, normalized title); grouped by tier (Top 5%, Top 20%, Reject).
 5. **Job detail** — for CPI ≥ 7: **referral targets** (up to 3: Recruiter, Hiring Manager, High-Signal Connector) from `job_referral_targets` (Google search URLs, why selected, status, copy message); optional **From your network** from `job_people` + `people`.
-6. **Agent** (`npm run agent`) — runs poll only 5pm–1am local, every 30 min.
+6. **Agent** (`npm run agent`) — runs poll every 30 min (default 24/7). See [docs/AGENT.md](AGENT.md) for how to run as a service.
 
 ---
 
@@ -94,7 +94,7 @@ flowchart TB
 | FR-1.2 | At least one parser type (Greenhouse, Workday, Ashby, Lever, SmartRecruiters). |
 | FR-1.3 | Fetch on demand (poll); new jobs in DB with title, location, URL, external_id, description. |
 | FR-1.4 | Deduplicate per source by external_id. |
-| FR-1.5 | (Optional) Agent runs poll only in time window (e.g. 5pm–1am), interval (e.g. 30 min). |
+| FR-1.5 | (Optional) Agent runs poll on interval (default 30 min, 24/7); optional time window. See [AGENT.md](AGENT.md). |
 
 **FR-2 — Fit scoring (gates + CPI)**
 
@@ -127,7 +127,7 @@ flowchart TB
 | ID | Requirement |
 |----|-------------|
 | FR-5.1 | Sources configurable (add/disable) via DB or seed. |
-| FR-5.2 | Agent window and interval documented and reproducible. |
+| FR-5.2 | Agent interval and window (default 24/7) documented; see [AGENT.md](AGENT.md) and REQUIREMENTS.md § Running the agent. |
 
 ---
 
@@ -158,5 +158,5 @@ flowchart TB
 
 - User can add sources, run poll, and see jobs in Inbox tiered by CPI.
 - User can copy connect note and referral ask and paste manually into LinkedIn.
-- Optional: Agent runs only in configured window without manual poll.
+- Optional: Agent runs on schedule (default 24/7, every 30 min) without manual poll.
 - No automatic applications or messages are ever sent.

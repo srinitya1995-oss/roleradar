@@ -115,7 +115,7 @@ Set these in `.env` in the project root (or in the process manager’s env) so b
 - `OPENAI_API_KEY` — optional; when set, the agent uses the LLM to pre-warm connections for Top 5% jobs.
 - `DATABASE_PATH` — optional; path to SQLite DB (default `roleradar.db` in project root).
 - `AGENT_POLL_INTERVAL_MS` — optional; interval between polls in ms (default 30 min).
-- `AGENT_ALWAYS_POLL` — set to `true` to poll 24/7; otherwise the agent only polls during the time window (default 5pm–1am local).
+- `AGENT_ALWAYS_POLL` — default is `true` (poll 24/7). Set to `false` to poll only during the time window (e.g. 5pm–1am local).
 - `AGENT_WARM_CONNECTIONS` — set to `false` to disable pre-warming connections after each poll.
 
 ## What the agent does each cycle

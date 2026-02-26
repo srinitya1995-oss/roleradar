@@ -24,6 +24,8 @@ Selective job aggregation and fit-scoring for Principal GenAI PM roles, with ref
 
 ## Getting Started
 
+**Full walkthrough (clone → env → seed → run app → run agent → push):** [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md)
+
 ### Dev server
 
 ```bash

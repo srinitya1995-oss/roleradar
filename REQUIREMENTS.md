@@ -49,7 +49,7 @@
 | FR-1.2 | The system SHALL support at least one parser type (e.g. Greenhouse). | Poll runs without error for each enabled source using its designated parser. |
 | FR-1.3 | The system SHALL fetch job listings from each enabled source on demand (e.g. via a “poll” command). | After poll, new jobs appear in the database with title, location, URL, external_id, and optional description. |
 | FR-1.4 | The system SHALL deduplicate jobs per source by external_id. | Re-running poll does not create duplicate rows for the same job at the same source. |
-| FR-1.5 | (Optional) The system SHALL support a scheduled “agent” that runs poll only within a configured time window (e.g. 5pm–1am local). | When the agent is run, it polls only when the current time falls in the window; outside the window it sleeps and rechecks without polling. |
+| FR-1.5 | (Optional) The system SHALL support a scheduled “agent” that runs poll on an interval (default 24/7; optional time window e.g. 5pm–1am local). | When the agent is run, it polls every 30 min by default (24/7); see [Running the agent](#running-the-agent) and [docs/AGENT.md](docs/AGENT.md). |
 
 ### 4.2 Fit scoring (CPI and gates)
 
@@ -82,7 +82,7 @@
 | ID | Requirement | Acceptance criteria |
 |----|-------------|---------------------|
 | FR-5.1 | Job sources SHALL be configurable (add/disable) without code change where possible (e.g. DB or config). | Seed script or admin flow can add a new company/URL/parser; poll uses only enabled sources. |
-| FR-5.2 | The nightly “agent” SHALL run only within a defined local time window (e.g. 5pm–1am) and SHALL poll at a defined interval (e.g. every 30 minutes) when inside the window. | Configurable or hardcoded window and interval; behavior is documented and reproducible. |
+| FR-5.2 | The "agent" SHALL poll at a defined interval (default every 30 min) and SHALL support 24/7 (default) or a time window (e.g. 5pm–1am). | Configurable via env (default 24/7); see [Running the agent](#running-the-agent) and [docs/AGENT.md](docs/AGENT.md). |
 
 ---
 
@@ -141,9 +141,47 @@
 
 - User can add at least one job source (e.g. Greenhouse), run poll, and see jobs in the Inbox tiered by CPI.
 - User can copy connect note and referral ask for any job and paste manually into LinkedIn.
-- Optional: User can run an agent that polls only during a set time window (e.g. 5pm–1am) without manual runs.
+- Optional: User can run an agent that polls on a schedule (default 24/7, every 30 min) without manual runs.
 - No automatic applications or messages are ever sent by the system.
 
 ---
 
-*This document is the product-manager-level specification for RoleRadar. Implementation may use different keyword lists or weights as long as the behavior matches the acceptance criteria above.*
+## Running the agent
+
+**Full step-by-step (clone through push):** [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md)
+
+The agent polls job sources on an interval and pre-warms referral connections for high-fit jobs. **Default: 24/7, every 30 minutes.**
+
+### Quick start (terminal)
+
+From the project root:
+
+```bash
+npm run agent
+```
+
+Leave the terminal open; the agent runs until you stop it (Ctrl+C). The app Inbox (http://localhost:3000/inbox) shows **Agent: Live** and **next update in X min** when the agent is running.
+
+### Run as a background service (keeps running after you close the terminal)
+
+- **PM2 (recommended):** `npm install -g pm2` then `pm2 start npm --name roleradar-agent -- run agent`. Commands: `pm2 logs roleradar-agent`, `pm2 restart roleradar-agent`, `pm2 stop roleradar-agent`.
+- **macOS launchd:** See [docs/AGENT.md](docs/AGENT.md) for a plist that starts the agent at login.
+- **One-off background:** `nohup npm run agent > agent.log 2>&1 &` (stops on reboot unless you use PM2/launchd).
+
+### Env (optional)
+
+| Env | Default | Description |
+|-----|---------|-------------|
+| `AGENT_POLL_INTERVAL_MS` | 30 min | Time between polls when active. |
+| `AGENT_ALWAYS_POLL` | `true` (24/7) | Set to `false` to poll only in time window (e.g. 5pm–1am). |
+| `AGENT_WINDOW_START_HOUR` | 17 | Start hour when not 24/7 (0–23). |
+| `AGENT_WINDOW_END_HOUR` | 1 | End hour when not 24/7 (0–23). |
+| `AGENT_WARM_CONNECTIONS` | `true` | Set to `false` to skip pre-warming referral targets after each poll. |
+| `OPENAI_API_KEY` | — | If set, agent uses LLM for Top 5% connection targets. |
+| `DATABASE_PATH` | `roleradar.db` | Path to SQLite DB. |
+
+Full details and plist example: [docs/AGENT.md](docs/AGENT.md).
+
+---
+
+*This document is the product-manager-level specification for Role Radar. Implementation may use different keyword lists or weights as long as the behavior matches the acceptance criteria above.*
