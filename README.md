@@ -1,6 +1,26 @@
-# RoleRadar
+# Role Radar
 
 Selective job aggregation and fit-scoring for Principal GenAI PM roles, with referral-ready copy and connection targets.
+
+## Push to GitHub
+
+1. **Create a new repo** on [GitHub](https://github.com/new):
+   - Name it `roleradar` (or any name).
+   - Leave **Add a README**, **.gitignore**, and **license** unchecked (this repo already has them).
+   - Click **Create repository**.
+
+2. **Add the remote and push** (replace `YOUR_USERNAME` with your GitHub username):
+
+   ```bash
+   git remote add origin https://github.com/YOUR_USERNAME/roleradar.git
+   git push -u origin main
+   ```
+
+   Or run the script (same replacement):
+
+   ```bash
+   ./scripts/setup-github-remote.sh https://github.com/YOUR_USERNAME/roleradar.git
+   ```
 
 ## Getting Started
 
@@ -39,7 +59,7 @@ Env (optional):
 | `AGENT_WINDOW_START_HOUR` | 17 | Start of active window (5pm) |
 | `AGENT_WINDOW_END_HOUR` | 1 | End of active window (1am) |
 | `AGENT_WARM_CONNECTIONS` | true | Pre-warm connections for Top 5% / Top 20% jobs after each poll |
-| `AGENT_ALWAYS_POLL` | false | Set to `true` to poll 24/7 (ignore time window) |
+| `AGENT_ALWAYS_POLL` | true (24/7) | Set to `false` to poll only in time window (e.g. 5pm–1am) |
 
 ### Other commands
 
