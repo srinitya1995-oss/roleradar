@@ -1,39 +1,41 @@
 /**
- * Agent helper v2: pre-warm referral targets. Top 5% always; Top 20% only if first_seen (created_at) <= 7 days. Cap 20 jobs/run.
+ * Agent helper: pre-warm referral targets for APPLY_NOW, STRONG_FIT, and top NEAR_MATCH (resume_match >= 88). Cap from settings.
  */
 import { db } from "./db";
-import { connectNote } from "./messages";
 import {
   getOrCreateReferralTargetsForJob,
   getReferralTargetsForJob,
   saveReferralTargets,
+  mergeReferralTargetsLlmWithHeuristic,
 } from "./referral-targets";
-import { getReferralTargetsFromLLMV2, llmTargetToSearchUrl } from "./referral-llm";
-
-const AGENT_WARM_CAP = 20;
+import { getReferralTargetsFromLLMV2 } from "./referral-llm";
+import { getSettings } from "./settings";
 
 /**
- * Jobs eligible for warm: Top 5% always; Top 20% only if created_at >= now - 7 days. No targets yet. Cap 20.
+ * Jobs eligible for prewarm: bucket APPLY_NOW, STRONG_FIT, or (NEAR_MATCH and resume_match >= 88). No targets yet. Cap from settings.
  */
-export function getHighFitJobsWithoutTargets(): { id: number; tier: string | null; cpi: number | null }[] {
+export function getHighFitJobsWithoutTargets(): { id: number; bucket: string | null; resume_match: number | null }[] {
+  const settings = getSettings();
+  const cap = Math.max(1, settings.prewarm_cap);
   const rows = db
     .prepare(
-      `SELECT j.id, j.tier, j.cpi
+      `SELECT j.id, j.bucket, j.resume_match
        FROM jobs j
        WHERE NOT EXISTS (SELECT 1 FROM job_referral_targets t WHERE t.job_id = j.id)
          AND (
-           j.tier = 'Top 5%'
-           OR (j.tier = 'Top 20%' AND j.created_at >= datetime('now', '-7 days'))
+           j.bucket = 'APPLY_NOW'
+           OR j.bucket = 'STRONG_FIT'
+           OR (j.bucket = 'NEAR_MATCH' AND COALESCE(j.resume_match, 0) >= 88)
          )
-       ORDER BY CASE j.tier WHEN 'Top 5%' THEN 1 WHEN 'Top 20%' THEN 2 ELSE 3 END, j.cpi DESC NULLS LAST, j.id DESC
+       ORDER BY CASE j.bucket WHEN 'APPLY_NOW' THEN 1 WHEN 'STRONG_FIT' THEN 2 ELSE 3 END, j.resume_match DESC NULLS LAST, j.final_fit_score DESC NULLS LAST, j.id DESC
        LIMIT ?`
     )
-    .all(AGENT_WARM_CAP) as { id: number; tier: string | null; cpi: number | null }[];
+    .all(cap) as { id: number; bucket: string | null; resume_match: number | null }[];
   return rows;
 }
 
 /**
- * Pre-warm one job: LLM for Top 5% when OPENAI_API_KEY set; else heuristic v2.
+ * Pre-warm one job: LLM for APPLY_NOW (or STRONG_FIT with high score) when OPENAI_API_KEY set; else heuristic v2.
  */
 export async function warmConnectionsForJob(jobId: number): Promise<boolean> {
   const existing = getReferralTargetsForJob(jobId);
@@ -41,7 +43,7 @@ export async function warmConnectionsForJob(jobId: number): Promise<boolean> {
 
   const row = db
     .prepare(
-      `SELECT j.id, j.title, j.description, j.location, j.external_id, j.tier, j.cpi, s.company
+      `SELECT j.id, j.title, j.description, j.location, j.external_id, j.bucket, j.final_fit_score, s.company
        FROM jobs j LEFT JOIN job_sources s ON j.source_id = s.id WHERE j.id = ?`
     )
     .get(jobId) as
@@ -51,8 +53,8 @@ export async function warmConnectionsForJob(jobId: number): Promise<boolean> {
         description: string | null;
         location: string | null;
         external_id: string | null;
-        tier: string | null;
-        cpi: number | null;
+        bucket: string | null;
+        final_fit_score: number | null;
         company: string | null;
       }
     | undefined;
@@ -63,7 +65,7 @@ export async function warmConnectionsForJob(jobId: number): Promise<boolean> {
   const jobIdStr = row.external_id ?? String(jobId);
   const useLLM =
     Boolean(process.env.OPENAI_API_KEY) &&
-    (row.tier === "Top 5%" || (row.cpi != null && row.cpi >= 8));
+    (row.bucket === "APPLY_NOW" || (row.bucket === "STRONG_FIT" && (row.final_fit_score ?? 0) >= 82));
 
   if (useLLM) {
     try {
@@ -75,26 +77,11 @@ export async function warmConnectionsForJob(jobId: number): Promise<boolean> {
         location: row.location,
       });
       if (payload?.targets?.length) {
-        const displayNames: Record<string, string> = {
-          recruiter: "Recruiter",
-          hiring_manager: "Hiring Manager",
-          high_signal_connector: "High-Signal Connector",
-        };
-        saveReferralTargets(
-          jobId,
-          payload.targets.map((t, i) => ({
-            slot: i + 1,
-            target_type: t.target_type,
-            search_query: t.search_query,
-            search_url: llmTargetToSearchUrl(t.search_query, company),
-            why_selected: t.why_selected,
-            confidence: t.confidence ?? 70,
-            archetype: payload.archetype ?? null,
-            source: "llm",
-            drafted_message: connectNote(displayNames[t.target_type] ?? t.target_type, jobIdStr),
-          }))
-        );
-        return true;
+        const merged = mergeReferralTargetsLlmWithHeuristic(jobId, payload.targets, company);
+        if (merged.length > 0) {
+          saveReferralTargets(jobId, merged);
+          return true;
+        }
       }
     } catch {
       // Fall through to heuristic
@@ -106,7 +93,7 @@ export async function warmConnectionsForJob(jobId: number): Promise<boolean> {
 }
 
 /**
- * Pre-warm connections for eligible jobs (Top 5% always, Top 20% if <= 7 days). Cap 20/run.
+ * Pre-warm connections for eligible jobs (APPLY_NOW, STRONG_FIT, top NEAR_MATCH). Cap from settings.
  */
 export async function warmConnectionsForHighFitJobs(): Promise<{ warmed: number; failed: number }> {
   const jobs = getHighFitJobsWithoutTargets();

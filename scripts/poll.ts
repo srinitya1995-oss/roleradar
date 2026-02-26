@@ -1,7 +1,7 @@
 /**
  * Poll enabled job_sources, run parser, insert new jobs. Dedup by external_id per source.
- * GATE 0–4 run first; only eligible PM roles get CPI computed and stored.
- * GATE 3: location must match allowed_locations (CA + Seattle variants; Remote removed).
+ * Gates: PM/PM-T/seniority + location (CA/Seattle; no remote-only unless allow_remote).
+ * Store final_fit_score, resume_match, bucket (APPLY_NOW / STRONG_FIT / NEAR_MATCH / REVIEW / HIDE).
  */
 import { db } from "../src/lib/db";
 import { parseGreenhouseBoard } from "../src/lib/parsers/greenhouse";
@@ -9,11 +9,16 @@ import { parseLeverBoard } from "../src/lib/parsers/lever";
 import { parseAshbyBoard } from "../src/lib/parsers/ashby";
 import { parseSmartRecruitersBoard } from "../src/lib/parsers/smartrecruiters";
 import { parseWorkdayBoard } from "../src/lib/parsers/workday";
-import { scoreCpi, cpiTier } from "../src/lib/cpi";
 import { passesTitleAndDescriptionGates } from "../src/lib/gates";
-import { getSettings, locationMatchesAllowed } from "../src/lib/settings";
+import { getSettings } from "../src/lib/settings";
+import { locationEligible } from "../src/lib/location";
+import { getPollIntervalMinutesForTier } from "../src/lib/source-tiers";
+import { computeFinalFitScore } from "../src/lib/scoring";
+import { computeBucket } from "../src/lib/buckets";
+import { profileMatchScore } from "../src/lib/profile";
+import { generateSuggestionsForNearMatch } from "../src/lib/suggestions";
 
-type JobSource = { id: number; company: string; url: string; parser: string };
+type JobSource = { id: number; company: string; url: string; parser: string; company_tier: number | null; last_polled_at: string | null };
 type ParsedJob = { title: string; url: string; location: string; external_id: string; description?: string; posted_at?: string | null };
 
 const parsers: Record<string, (url: string) => Promise<ParsedJob[]>> = {
@@ -25,8 +30,8 @@ const parsers: Record<string, (url: string) => Promise<ParsedJob[]>> = {
 };
 
 const insertJob = db.prepare(`
-  INSERT INTO jobs (source_id, external_id, title, location, url, description, cpi, tier, created_at, posted_at)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?)
+  INSERT INTO jobs (source_id, external_id, title, location, url, description, cpi, tier, created_at, posted_at, first_seen_at, last_seen_at, final_fit_score, resume_match, bucket, suggestions_json)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?, datetime('now'), datetime('now'), ?, ?, ?, ?)
 `);
 
 function getExistingExternalIds(sourceId: number): Set<string> {
@@ -34,10 +39,34 @@ function getExistingExternalIds(sourceId: number): Set<string> {
   return new Set(rows.map((r) => r.external_id ?? ""));
 }
 
-/** Run one poll cycle; exported for use by agent. */
-export async function runPoll(): Promise<number> {
-  const sources = db.prepare("SELECT id, company, url, parser FROM job_sources WHERE enabled = 1").all() as JobSource[];
+export type InsertedJob = {
+  title: string;
+  company: string;
+  location: string;
+  url: string;
+  final_fit_score: number;
+  resume_match: number;
+  bucket: string;
+};
+
+/** V2: source is "due" if never polled or last_polled_at + tier interval has passed. */
+function sourceDue(source: JobSource): boolean {
+  const tier = source.company_tier ?? 3;
+  const intervalMs = getPollIntervalMinutesForTier(tier) * 60 * 1000;
+  const last = source.last_polled_at ? new Date(source.last_polled_at).getTime() : 0;
+  return last + intervalMs <= Date.now();
+}
+
+const updateLastPolled = db.prepare("UPDATE job_sources SET last_polled_at = datetime('now') WHERE id = ?");
+
+/** Run one poll cycle; exported for use by agent. V2: only polls sources that are due by tier (30min/2hr/daily). */
+export async function runPoll(): Promise<{ count: number; inserted: InsertedJob[] }> {
+  const allSources = db.prepare(
+    "SELECT id, company, url, parser, company_tier, last_polled_at FROM job_sources WHERE enabled = 1"
+  ).all() as JobSource[];
+  const sources = allSources.filter(sourceDue);
   let totalInserted = 0;
+  const inserted: InsertedJob[] = [];
 
   for (const source of sources) {
     const run = parsers[source.parser];
@@ -49,16 +78,36 @@ export async function runPoll(): Promise<number> {
       const jobs = await run(source.url);
       const settings = getSettings();
       const existing = getExistingExternalIds(source.id);
-      let inserted = 0;
+      let insertedThisSource = 0;
+      let skippedExisting = 0;
+      let skippedLocation = 0;
+      let skippedGates = 0;
       for (const job of jobs) {
-        if (existing.has(job.external_id)) continue;
+        if (existing.has(job.external_id)) {
+          skippedExisting++;
+          continue;
+        }
         const title = job.title ?? null;
         const location = job.location ?? "";
         const description = job.description ?? null;
-        if (!locationMatchesAllowed(location, settings.allowed_locations)) continue;
-        if (!passesTitleAndDescriptionGates(title, description)) continue;
-        const cpi = scoreCpi(title, description);
-        const tier = cpi != null ? cpiTier(cpi) : null;
+        if (!locationEligible(location, settings.allowed_locations, settings.allow_remote)) {
+          skippedLocation++;
+          continue;
+        }
+        if (!passesTitleAndDescriptionGates(title, description, settings.allow_gpm)) {
+          skippedGates++;
+          continue;
+        }
+        const final_fit_score = computeFinalFitScore(title, description);
+        const resume_match = profileMatchScore(title, description);
+        const bucket = computeBucket(resume_match, final_fit_score);
+        const suggestions_json =
+          bucket === "NEAR_MATCH" && (description ?? "").trim()
+            ? JSON.stringify(generateSuggestionsForNearMatch(title, description))
+            : null;
+        // tier/cpi are legacy back-compat; canonical is bucket (APPLY_NOW / STRONG_FIT / NEAR_MATCH / REVIEW / HIDE).
+        const cpi = final_fit_score >= 0 ? Math.round(final_fit_score / 10) : null;
+        const tier = cpi != null ? (cpi >= 9 ? "Top 5%" : cpi >= 7 ? "Top 20%" : "Reject") : null;
         insertJob.run(
           source.id,
           job.external_id,
@@ -69,23 +118,42 @@ export async function runPoll(): Promise<number> {
           cpi,
           tier,
           job.posted_at ?? null,
+          final_fit_score,
+          resume_match,
+          bucket,
+          suggestions_json,
         );
         existing.add(job.external_id);
-        inserted++;
+        insertedThisSource++;
         totalInserted++;
+        inserted.push({
+          title: job.title ?? "",
+          company: source.company,
+          location: job.location ?? "",
+          url: job.url ?? "",
+          final_fit_score,
+          resume_match,
+          bucket,
+        });
       }
-      console.log(`${source.company}: ${jobs.length} jobs, ${inserted} new (after gates + location)`);
+      const newCandidates = jobs.length - skippedExisting;
+      console.log(
+        `${source.company}: ${jobs.length} fetched, ${skippedExisting} already in DB, ` +
+        `${newCandidates} candidates → ${skippedLocation} failed location, ${skippedGates} failed gates → ${insertedThisSource} new`
+      );
+      updateLastPolled.run(source.id);
     } catch (err) {
       console.error(`${source.company} (${source.parser}):`, err);
     }
   }
 
   console.log(`Done. Total new jobs inserted: ${totalInserted}`);
-  return totalInserted;
+  return { count: totalInserted, inserted };
 }
 
 async function main() {
-  await runPoll();
+  const { count } = await runPoll();
+  console.log(`Total: ${count} new jobs.`);
   process.exit(0);
 }
 

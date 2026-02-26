@@ -1,0 +1,24 @@
+{
+  "recency_days": 21,
+  "allow_remote": false,
+  "allow_gpm": false,
+  "target_stale_days": 14,
+  "prewarm_cap": 20,
+  "max_targets_per_job": 4,
+  "allowed_locations": [
+    "CA",
+    "California",
+    "Seattle",
+    "San Francisco",
+    "SF",
+    "Los Angeles",
+    "LA",
+    "Bellevue",
+    "Redmond",
+    "Seattle, WA",
+    "San Francisco, CA",
+    "Los Angeles, CA",
+    "Bellevue, WA",
+    "Redmond, WA"
+  ]
+}

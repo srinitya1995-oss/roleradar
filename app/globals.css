@@ -46,6 +46,8 @@ a {
 .inbox-page h1 { font-size: 1.5rem; margin-bottom: 0.25rem; }
 .agent-status { font-size: 0.875rem; margin-bottom: 1rem; opacity: 0.85; }
 .agent-status code { font-size: 0.8em; padding: 0.1em 0.3em; background: rgba(0,0,0,0.06); border-radius: 3px; }
+.inbox-refresh-btn { font-size: 0.875rem; padding: 0.25rem 0.5rem; cursor: pointer; border-radius: 4px; border: 1px solid #555; background: transparent; color: inherit; }
+.inbox-refresh-btn:hover { background: rgba(0,0,0,0.06); }
 .inbox-loading, .inbox-error { padding: 2rem; text-align: center; }
 .inbox-error { color: var(--foreground); }
 .tier-section { margin-bottom: 2rem; }
@@ -60,3 +62,6 @@ a {
 .job-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
 .copy-btn { font-size: 0.8125rem; padding: 0.35rem 0.6rem; cursor: pointer; border-radius: 4px; border: 1px solid #555; background: var(--background); color: var(--foreground); }
 .copy-btn:hover { background: #333; color: #eee; }
+.refresh-targets-link { font-size: 0.8125rem; color: #2563eb; text-decoration: underline; }
+.refresh-targets-link:hover { color: #1d4ed8; }
+.bucket-badge { font-size: 0.8125rem; font-weight: 600; color: #059669; margin-left: 0.25rem; }

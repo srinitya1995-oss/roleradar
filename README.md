@@ -60,7 +60,7 @@ Env (optional):
 | `AGENT_POLL_INTERVAL_MS` | 30 min | Minutes between polls when active |
 | `AGENT_WINDOW_START_HOUR` | 17 | Start of active window (5pm) |
 | `AGENT_WINDOW_END_HOUR` | 1 | End of active window (1am) |
-| `AGENT_WARM_CONNECTIONS` | true | Pre-warm connections for Top 5% / Top 20% jobs after each poll |
+| `AGENT_WARM_CONNECTIONS` | true | Pre-warm connections for Apply now / Strong fit / top Near match jobs after each poll |
 | `AGENT_ALWAYS_POLL` | true (24/7) | Set to `false` to poll only in time window (e.g. 5pm–1am) |
 
 ### Other commands

@@ -138,7 +138,7 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/api/jobs")
+    fetch("/api/jobs/list")
       .then((r) => r.ok ? r.json() : Promise.reject(new Error(r.statusText)))
       .then((res) => setData({ jobsByCompany: res.jobsByCompany ?? [] }))
       .catch((e) => setError(e.message))

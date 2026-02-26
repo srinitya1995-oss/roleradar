@@ -1,14 +1,13 @@
 /**
- * Shared jobs list API logic. Used by app/api/jobs/route.ts and pages/api/jobs.ts.
+ * Shared jobs list API logic. Used by app/api/jobs/list/route.ts and pages/api/jobs.ts.
+ * Canonical: recency_days (posted_at OR first_seen_at), locationEligible (CA/Seattle; no remote unless allow_remote), bucket as source of truth.
  */
 import { db } from "@/src/lib/db";
 import { profileMatchScore } from "@/src/lib/profile";
-import { eligibleForConnections } from "@/src/lib/referral-targets";
-import {
-  getSettings,
-  locationMatchesAllowed,
-  matchesRejectKeywords,
-} from "@/src/lib/settings";
+import { needConnectionsV2 } from "@/src/lib/referral-targets";
+import { getSettings } from "@/src/lib/settings";
+import { locationEligible } from "@/src/lib/location";
+import { computeBucket, type Bucket } from "@/src/lib/buckets";
 
 export type JobRow = {
   id: number;
@@ -22,27 +21,45 @@ export type JobRow = {
   created_at: string | null;
   posted_at: string | null;
   company: string | null;
+  first_seen_at: string | null;
+  final_fit_score: number | null;
+  resume_match: number | null;
+  bucket: string | null;
 };
 
 function normalizeTitle(title: string | null | undefined): string {
   return (title ?? "").trim().toLowerCase().replace(/\s+/g, " ");
 }
 
+/** Use stored bucket when non-null and valid; only derive for legacy rows not yet backfilled. */
+function effectiveBucket(r: JobRow): Bucket {
+  if (r.bucket && ["APPLY_NOW", "STRONG_FIT", "NEAR_MATCH", "REVIEW", "HIDE"].includes(r.bucket))
+    return r.bucket as Bucket;
+  const resume = r.resume_match ?? profileMatchScore(r.title, r.description);
+  const fit = r.final_fit_score ?? (r.cpi != null ? r.cpi * 10 : 0);
+  return computeBucket(resume, fit);
+}
+
 export function getJobsPayload(): {
   top5: unknown[];
   top20: unknown[];
   rejectedRelevantOnly: unknown[];
+  reject: unknown[];
   other: unknown[];
   jobsByCompany: { company: string; jobs: unknown[] }[];
 } {
   const settings = getSettings();
+  const recencyDays = Math.max(1, settings.recency_days);
   const rows = db.prepare(`
-  SELECT j.id, j.title, j.location, j.url, j.external_id, j.cpi, j.tier, j.description, j.created_at, j.posted_at, s.company
+  SELECT j.id, j.title, j.location, j.url, j.external_id, j.cpi, j.tier, j.description, j.created_at, j.posted_at, j.first_seen_at, j.final_fit_score, j.resume_match, j.bucket, s.company
   FROM jobs j
   LEFT JOIN job_sources s ON j.source_id = s.id
-  WHERE j.created_at >= datetime('now', '-7 days')
-  ORDER BY CASE j.tier WHEN 'Top 5%' THEN 1 WHEN 'Top 20%' THEN 2 ELSE 3 END, j.cpi DESC, j.id DESC
-`).all() as JobRow[];
+  WHERE (
+    (j.posted_at IS NOT NULL AND j.posted_at >= datetime('now', '-' || ? || ' days'))
+    OR (j.posted_at IS NULL AND COALESCE(j.first_seen_at, j.created_at) >= datetime('now', '-' || ? || ' days'))
+  )
+  ORDER BY COALESCE(j.posted_at, j.first_seen_at, j.created_at) DESC, j.final_fit_score DESC NULLS LAST, j.cpi DESC NULLS LAST, j.id DESC
+`).all(recencyDays, recencyDays) as JobRow[];
 
   const dedupeKey = (r: JobRow) => `${(r.company ?? "").trim().toLowerCase()}|${normalizeTitle(r.title)}`;
   const seen = new Set<string>();
@@ -54,42 +71,32 @@ export function getJobsPayload(): {
     deduped.push(r);
   }
 
-  const byLocation = (r: JobRow) => locationMatchesAllowed(r.location, settings.allowed_locations);
+  const byLocation = (r: JobRow) => locationEligible(r.location, settings.allowed_locations, settings.allow_remote);
+  const eligible = deduped.filter(byLocation);
 
-  const top5 = deduped.filter((r) => r.tier === "Top 5%" && byLocation(r));
-  const top20 = deduped.filter((r) => r.tier === "Top 20%" && byLocation(r));
+  const apply_now = eligible.filter((r) => effectiveBucket(r) === "APPLY_NOW");
+  const strong_fit = eligible.filter((r) => effectiveBucket(r) === "STRONG_FIT");
+  const near_match = eligible.filter((r) => effectiveBucket(r) === "NEAR_MATCH");
+  const review = eligible.filter((r) => effectiveBucket(r) === "REVIEW");
+  const hide = eligible.filter((r) => effectiveBucket(r) === "HIDE");
 
-  let rejectedRelevantOnly: JobRow[] = [];
-  if (settings.show_reject_bucket) {
-    const minCpi = settings.reject_cpi_min_to_show;
-    const maxCpi = settings.reject_cpi_max_to_show;
-    const keywords = settings.reject_must_have_any_keywords;
-    rejectedRelevantOnly = deduped.filter((r) => {
-      if (!byLocation(r)) return false;
-      const cpi = r.cpi;
-      if (cpi == null || cpi < minCpi || cpi > maxCpi) return false;
-      if (!matchesRejectKeywords(r.title, r.description, keywords)) return false;
-      return true;
-    });
-  }
-
-  const inOther = new Set([...top5, ...top20, ...rejectedRelevantOnly].map((r) => r.id));
-  const other = deduped.filter((r) => !inOther.has(r.id));
-
-  const allJobs = [...top5, ...top20, ...rejectedRelevantOnly, ...other];
+  const allJobs = [...apply_now, ...strong_fit, ...near_match, ...review, ...hide];
 
   const jobIds = allJobs.map((r) => r.id);
   const targetsByJob: Record<number, { target_type: string; why_selected: string; confidence: number | null }[]> = {};
+  const targetsOldestCreatedAt: Record<number, string | null> = {};
   if (jobIds.length > 0) {
     const placeholders = jobIds.map(() => "?").join(",");
     const targetRows = db
       .prepare(
-        `SELECT job_id, slot, target_type, why_selected, confidence FROM job_referral_targets WHERE job_id IN (${placeholders}) ORDER BY job_id, slot`
+        `SELECT job_id, slot, target_type, why_selected, confidence, created_at FROM job_referral_targets WHERE job_id IN (${placeholders}) ORDER BY job_id, slot`
       )
-      .all(...jobIds) as { job_id: number; target_type: string; why_selected: string; confidence: number | null }[];
+      .all(...jobIds) as { job_id: number; target_type: string; why_selected: string; confidence: number | null; created_at: string | null }[];
     for (const t of targetRows) {
       if (!targetsByJob[t.job_id]) targetsByJob[t.job_id] = [];
       targetsByJob[t.job_id].push({ target_type: t.target_type, why_selected: t.why_selected, confidence: t.confidence ?? null });
+      const existing = targetsOldestCreatedAt[t.job_id];
+      if (!existing || (t.created_at && t.created_at < existing)) targetsOldestCreatedAt[t.job_id] = t.created_at ?? null;
     }
   }
 
@@ -98,29 +105,34 @@ export function getJobsPayload(): {
       recruiter: "Recruiter",
       hiring_manager: "Hiring Manager",
       high_signal_connector: "High-Signal Connector",
+      team_pm_or_peer: "Team PM / Peer",
     };
     return m[type] ?? type;
   };
 
-  function matchLabel(r: JobRow, profilePct: number): string {
-    if (profilePct >= 70 && r.cpi != null && r.cpi >= 7) return "Resume match";
-    if (r.tier === "Top 5%") return "Resume match";
-    if (r.tier === "Top 20%") return "Good match";
-    if (r.cpi != null && r.cpi >= 5 && r.cpi <= 6) return "Good match (minor edits)";
-    if (profilePct >= 50) return "Good match (minor edits)";
+  function matchLabel(r: JobRow, resumeMatch: number, finalFitScore: number): string {
+    if (resumeMatch >= 95 && finalFitScore >= 85) return "Resume match";
+    if (resumeMatch >= 90 && finalFitScore >= 80) return "Good match";
+    if (resumeMatch >= 80 && finalFitScore >= 70) return "Good match (minor edits)";
+    if (resumeMatch >= 70) return "Review";
     return "Review";
   }
 
-  const toPayload = (jobs: JobRow[]) =>
+  const staleCutoff = new Date(Date.now() - settings.target_stale_days * 24 * 60 * 60 * 1000).toISOString();
+
+  const toPayload = (jobs: JobRow[], bucket: string) =>
     jobs.map((r) => {
-      const profilePct = profileMatchScore(r.title, r.description);
-      const cpiPct = r.cpi != null ? (r.cpi / 10) * 100 : 0;
-      const match_pct = r.cpi != null
-        ? Math.round(0.5 * cpiPct + 0.5 * profilePct)
-        : profilePct;
+      const resumeMatch = r.resume_match ?? profileMatchScore(r.title, r.description);
+      const final_fit_score = r.final_fit_score ?? (r.cpi != null ? r.cpi * 10 : 0);
+      const match_pct = Math.round(0.5 * resumeMatch + 0.5 * Math.min(100, final_fit_score));
+      const needConnections = needConnectionsV2(bucket, final_fit_score);
       const targets = targetsByJob[r.id] ?? [];
-      const eligible = eligibleForConnections(r.tier ?? null, r.cpi ?? null);
-      const connection_status = !eligible ? "n/a" : targets.length > 0 ? "found" : "not_found";
+      const oldestTarget = targetsOldestCreatedAt[r.id];
+      let connection_status: string;
+      if (!needConnections) connection_status = "n/a";
+      else if (targets.length === 0) connection_status = "not_found";
+      else if (oldestTarget && oldestTarget < staleCutoff) connection_status = "stale";
+      else connection_status = "found";
       const connection_targets =
         targets.length > 0
           ? targets.map((t) => ({
@@ -138,17 +150,26 @@ export function getJobsPayload(): {
         cpi: r.cpi,
         tier: r.tier,
         company: r.company ?? null,
-        date_posted: r.posted_at ?? r.created_at ?? null,
-        match_label: matchLabel(r, profilePct),
-        profile_match_pct: profilePct,
+        date_posted: r.posted_at ?? r.first_seen_at ?? r.created_at ?? null,
+        match_label: matchLabel(r, resumeMatch, final_fit_score),
+        profile_match_pct: resumeMatch,
         match_pct,
+        bucket,
+        final_fit_score,
         connection_status,
         connection_targets,
       };
     });
 
-  const byCompany: Record<string, ReturnType<typeof toPayload>[0][]> = {};
-  for (const job of toPayload(allJobs)) {
+  const payloadApplyNow = toPayload(apply_now, "APPLY_NOW");
+  const payloadStrongFit = toPayload(strong_fit, "STRONG_FIT");
+  const payloadNearMatch = toPayload(near_match, "NEAR_MATCH");
+  const payloadReview = toPayload(review, "REVIEW");
+  const payloadHide = toPayload(hide, "HIDE");
+  const allPayloads = [...payloadApplyNow, ...payloadStrongFit, ...payloadNearMatch, ...payloadReview, ...payloadHide];
+
+  const byCompany: Record<string, typeof allPayloads> = {};
+  for (const job of allPayloads) {
     const company = (job.company ?? "Other").trim() || "Other";
     if (!byCompany[company]) byCompany[company] = [];
     byCompany[company].push(job);
@@ -156,10 +177,11 @@ export function getJobsPayload(): {
   const companyNames = Object.keys(byCompany).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
 
   return {
-    top5: toPayload(top5),
-    top20: toPayload(top20),
-    rejectedRelevantOnly: toPayload(rejectedRelevantOnly),
-    other: toPayload(other),
+    top5: payloadApplyNow,
+    top20: payloadStrongFit,
+    rejectedRelevantOnly: payloadNearMatch,
+    reject: payloadReview,
+    other: payloadHide,
     jobsByCompany: companyNames.map((company) => ({ company, jobs: byCompany[company]! })),
   };
 }

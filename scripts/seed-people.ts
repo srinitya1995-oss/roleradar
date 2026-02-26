@@ -50,5 +50,5 @@ for (const p of people) {
   insert.run(p.name, p.title, p.company, p.linkedin_url, p.relationship_type, p.connection_status, p.notes);
 }
 
-console.log(`Seeded ${people.length} people. Recommendations will show for CPI >= 7 jobs.`);
+console.log(`Seeded ${people.length} people. Recommendations show on job detail; most relevant for Apply now / Strong fit / Near match jobs.`);
 process.exit(0);

@@ -1,5 +1,5 @@
 /**
- * Outreach recommendation logic for CPI >= 7 jobs.
+ * Outreach recommendation logic for jobs (most relevant for high-fit: Apply now / Strong fit / Near match).
  * Prioritize: same company, Ex-Amazon, Adjacent org. Up to 3 people.
  * No LinkedIn scraping; uses people pool only.
  * For LLM/search-based target finding, use REFERRAL_TARGET_FINDER_SYSTEM_PROMPT from ./prompts.

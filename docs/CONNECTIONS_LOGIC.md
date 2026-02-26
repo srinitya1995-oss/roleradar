@@ -1,5 +1,9 @@
 # Connections Logic (Referral Targets)
 
+**LEGACY.** This doc describes CPI gating and 3 slots. Canonical spec: **[CONNECTIONS_LOGIC_V2_SPEC.md](CONNECTIONS_LOGIC_V2_SPEC.md)** (Fit gating, 4 slots, TEAM_CONTEXT, heuristic/LLM, stale/refresh, UI). Use that doc for current behavior.
+
+---
+
 Connections are **referral outreach targets** for each job: Recruiter, Hiring Manager, and High-Signal Connector. They are stored in `job_referral_targets` and surfaced on the job page and in the dashboard Connections column.
 
 ---

@@ -1,22 +1,21 @@
 import { NextResponse } from "next/server";
 import { db } from "@/src/lib/db";
 import { connectNote } from "@/src/lib/messages";
+import { getSettings } from "@/src/lib/settings";
 import {
   getRecommendationsForJob,
   getExistingRecommendations,
   updateOutreachStatus,
 } from "@/src/lib/recommendations";
 import {
-  eligibleForConnections,
+  needConnectionsV2,
   getOrCreateReferralTargetsForJob,
   getReferralTargetsForJob,
   saveReferralTargets,
   updateReferralTargetStatus,
+  mergeReferralTargetsLlmWithHeuristic,
 } from "@/src/lib/referral-targets";
-import {
-  getReferralTargetsFromLLMV2,
-  llmTargetToSearchUrl,
-} from "@/src/lib/referral-llm";
+import { getReferralTargetsFromLLMV2 } from "@/src/lib/referral-llm";
 
 type JobRow = {
   id: number;
@@ -29,7 +28,12 @@ type JobRow = {
   source_id: number | null;
   created_at?: string | null;
   posted_at?: string | null;
+  first_seen_at?: string | null;
   company?: string | null;
+  bucket: string | null;
+  final_fit_score: number | null;
+  resume_match: number | null;
+  suggestions_json: string | null;
 };
 
 export async function GET(
@@ -42,22 +46,24 @@ export async function GET(
   }
 
   const job = db.prepare(
-    "SELECT j.id, j.title, j.location, j.url, j.external_id, j.cpi, j.tier, j.source_id, j.created_at, j.posted_at, s.company FROM jobs j LEFT JOIN job_sources s ON j.source_id = s.id WHERE j.id = ?"
+    `SELECT j.id, j.title, j.location, j.url, j.external_id, j.cpi, j.tier, j.source_id, j.created_at, j.posted_at, j.first_seen_at, j.bucket, j.final_fit_score, j.resume_match, j.suggestions_json, s.company
+     FROM jobs j LEFT JOIN job_sources s ON j.source_id = s.id WHERE j.id = ?`
   ).get(id) as JobRow | undefined;
 
   if (!job) {
     return NextResponse.json({ error: "Job not found" }, { status: 404 });
   }
 
-  let recommendations = getExistingRecommendations(id);
-  if (recommendations.length === 0) {
-    recommendations = getRecommendationsForJob(id);
-  }
+  const settings = getSettings();
+  const finalFitScore = job.final_fit_score ?? (job.cpi != null ? job.cpi * 10 : 0);
+  const eligible = needConnectionsV2(job.bucket ?? null, finalFitScore);
 
-  const eligible = eligibleForConnections(job.tier ?? null, job.cpi ?? null);
   const url = new URL(request.url);
   const refreshTargets = url.searchParams.get("refresh_targets") === "1";
-  const shouldAutoGenerate = eligible || refreshTargets;
+
+  if (refreshTargets) {
+    db.prepare("DELETE FROM job_referral_targets WHERE job_id = ?").run(id);
+  }
 
   let referral_targets: Array<{
     slot: number;
@@ -69,15 +75,17 @@ export async function GET(
     source: string | null;
     outreach_status: string;
     drafted_message: string;
+    created_at: string | null;
   }> = [];
 
+  const shouldAutoGenerate = eligible || refreshTargets;
   if (shouldAutoGenerate) {
     const existingTargets = getReferralTargetsForJob(id);
     const useLLM =
       Boolean(process.env.OPENAI_API_KEY) &&
-      (refreshTargets || (existingTargets.length === 0 && eligible));
+      (refreshTargets || existingTargets.length === 0);
 
-    if (useLLM) {
+    if (useLLM && existingTargets.length === 0) {
       try {
         const jobDetail = db
           .prepare(
@@ -86,56 +94,66 @@ export async function GET(
           .get(id) as { title: string | null; description: string | null; location: string | null; external_id: string | null; company: string | null } | undefined;
         if (jobDetail) {
           const company = (jobDetail.company ?? "").trim() || "Company";
-          const jobIdStr = jobDetail.external_id ?? String(id);
           const payload = await getReferralTargetsFromLLMV2({
             title: jobDetail.title,
             company,
-            job_id: jobIdStr,
+            job_id: String(id),
             description: jobDetail.description,
             location: jobDetail.location,
           });
           if (payload?.targets?.length) {
-            const displayNames: Record<string, string> = {
-              recruiter: "Recruiter",
-              hiring_manager: "Hiring Manager",
-              high_signal_connector: "High-Signal Connector",
-            };
-            saveReferralTargets(
-              id,
-              payload.targets.map((t, i) => ({
-                slot: i + 1,
-                target_type: t.target_type,
-                search_query: t.search_query,
-                search_url: llmTargetToSearchUrl(t.search_query, company),
-                why_selected: t.why_selected,
-                confidence: t.confidence ?? 70,
-                archetype: payload.archetype ?? null,
-                source: "llm",
-                drafted_message: connectNote(displayNames[t.target_type] ?? t.target_type, jobIdStr),
-              }))
-            );
+            const merged = mergeReferralTargetsLlmWithHeuristic(id, payload.targets, company);
+            if (merged.length > 0) saveReferralTargets(id, merged);
           }
         }
       } catch {
-        // LLM failed; fall through to heuristic
+        // fall through to heuristic
       }
     }
 
     const targets = getReferralTargetsForJob(id).length > 0
       ? getReferralTargetsForJob(id)
       : getOrCreateReferralTargetsForJob(id);
-    referral_targets = targets.map((t) => ({
-      slot: t.slot,
-      target_type: t.target_type,
-      search_url: t.search_url,
-      why_selected: t.why_selected,
-      confidence: t.confidence ?? null,
-      archetype: t.archetype ?? null,
-      source: t.source ?? null,
-      outreach_status: t.outreach_status,
-      drafted_message: t.drafted_message,
+    const targetRowsWithCreated = db
+      .prepare("SELECT job_id, slot, target_type, search_url, why_selected, confidence, archetype, source, outreach_status, drafted_message, created_at FROM job_referral_targets WHERE job_id = ? ORDER BY slot")
+      .all(id) as Array<{ created_at: string | null } & Record<string, unknown>>;
+    referral_targets = targetRowsWithCreated.map((t) => ({
+      slot: t.slot as number,
+      target_type: t.target_type as string,
+      search_url: t.search_url as string,
+      why_selected: t.why_selected as string,
+      confidence: (t.confidence as number | null) ?? null,
+      archetype: (t.archetype as string | null) ?? null,
+      source: (t.source as string | null) ?? null,
+      outreach_status: t.outreach_status as string,
+      drafted_message: t.drafted_message as string,
+      created_at: t.created_at ?? null,
     }));
   }
+
+  const oldestTargetCreated = referral_targets.length > 0
+    ? referral_targets.reduce((min, t) => (!t.created_at ? min : (!min || t.created_at < min ? t.created_at : min)), null as string | null)
+    : null;
+  const staleCutoff = new Date(Date.now() - settings.target_stale_days * 24 * 60 * 60 * 1000).toISOString();
+  let connection_status: string;
+  if (!eligible) connection_status = "n/a";
+  else if (referral_targets.length === 0) connection_status = "not_found";
+  else if (oldestTargetCreated && oldestTargetCreated < staleCutoff) connection_status = "stale";
+  else connection_status = "found";
+
+  let suggestions: Array<{ emphasize: string; where: string; example: string }> = [];
+  try {
+    if (job.suggestions_json) {
+      const parsed = JSON.parse(job.suggestions_json);
+      if (Array.isArray(parsed)) suggestions = parsed;
+    }
+  } catch {
+    // ignore
+  }
+
+  const recommendations = getExistingRecommendations(id).length > 0
+    ? getExistingRecommendations(id)
+    : getRecommendationsForJob(id);
 
   return NextResponse.json({
     job: {
@@ -144,27 +162,22 @@ export async function GET(
       location: job.location,
       url: job.url,
       external_id: job.external_id,
-      cpi: job.cpi,
-      tier: job.tier,
       company: job.company ?? null,
-      date_posted: job.posted_at ?? job.created_at ?? null,
+      date_posted: job.posted_at ?? job.first_seen_at ?? job.created_at ?? null,
+      bucket: job.bucket ?? null,
+      final_fit_score: job.final_fit_score ?? null,
+      resume_match: job.resume_match ?? null,
     },
     recommendations: recommendations.map(({ person, job_person }) => ({
-      person: {
-        id: person.id,
-        name: person.name,
-        title: person.title,
-        company: person.company,
-        linkedin_url: person.linkedin_url,
-        relationship_type: person.relationship_type,
-        connection_status: person.connection_status,
-      },
+      person: { id: person.id, name: person.name, title: person.title, company: person.company, linkedin_url: person.linkedin_url, relationship_type: person.relationship_type, connection_status: person.connection_status },
       message_type: job_person.message_type,
       drafted_message: job_person.drafted_message,
       outreach_status: job_person.outreach_status,
     })),
     referral_targets,
+    connection_status,
     eligible_for_connections: eligible,
+    suggestions,
   });
 }
 
@@ -193,7 +206,7 @@ export async function PATCH(
     return NextResponse.json({ error: "Invalid outreach_status" }, { status: 400 });
   }
 
-  if (typeof slot === "number" && Number.isInteger(slot) && slot >= 1 && slot <= 3) {
+  if (typeof slot === "number" && Number.isInteger(slot) && slot >= 1 && slot <= 4) {
     updateReferralTargetStatus(id, slot, outreachStatus);
     return NextResponse.json({ ok: true });
   }
@@ -202,7 +215,7 @@ export async function PATCH(
     return NextResponse.json({ ok: true });
   }
   return NextResponse.json(
-    { error: "Either person_id or slot (1–3) required" },
+    { error: "Either person_id or slot (1–4) required" },
     { status: 400 }
   );
 }

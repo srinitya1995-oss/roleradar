@@ -9,7 +9,7 @@ import { getSettings } from "./settings";
 import { classifyJobArchetype, generateHeuristicTargetsV2 } from "./referral-v2";
 import { getRecommendationsForJob } from "./recommendations";
 
-export type TargetType = "recruiter" | "hiring_manager" | "high_signal_connector";
+export type TargetType = "recruiter" | "hiring_manager" | "team_pm_or_peer" | "high_signal_connector";
 
 export type ReferralTargetRow = {
   job_id: number;
@@ -30,10 +30,19 @@ const OUTREACH_STATUSES = ["queued", "sent", "responded"] as const;
 const REFERRAL_SELECT =
   "SELECT job_id, slot, target_type, search_query, search_url, why_selected, confidence, archetype, source, outreach_status, drafted_message FROM job_referral_targets";
 
-/** eligibleForConnections = (tier in {Top 5%, Top 20%}) OR (cpi != null && cpi >= 7) */
+/**
+ * Legacy: (tier in {Top 5%, Top 20%}) OR (cpi != null && cpi >= 7). Not used; API uses needConnectionsV2(bucket, finalFitScore).
+ * @deprecated Use needConnectionsV2(bucket, final_fit_score) instead.
+ */
 export function eligibleForConnections(tier: string | null, cpi: number | null): boolean {
   if (tier === "Top 5%" || tier === "Top 20%") return true;
   return cpi != null && cpi >= 7;
+}
+
+/** V2: needConnections = FINAL_FIT_SCORE >= 75 OR bucket in {APPLY_NOW, STRONG_FIT, NEAR_MATCH} */
+export function needConnectionsV2(bucket: string | null, finalFitScore: number): boolean {
+  if (finalFitScore >= 75) return true;
+  return bucket === "APPLY_NOW" || bucket === "STRONG_FIT" || bucket === "NEAR_MATCH";
 }
 
 function getJobContext(jobId: number): {
@@ -77,7 +86,7 @@ export function getOrCreateReferralTargetsForJob(jobId: number): ReferralTargetR
   if (!job) return [];
 
   const settings = getSettings();
-  const maxTargets = Math.min(Math.max(1, settings.max_targets_per_job), 3);
+  const maxTargets = Math.min(Math.max(1, settings.max_targets_per_job), 4);
 
   const existing = db.prepare(`${REFERRAL_SELECT} WHERE job_id = ? ORDER BY slot`).all(jobId) as ReferralTargetRow[];
   if (existing.length >= maxTargets) return existing.slice(0, maxTargets);
@@ -93,6 +102,7 @@ export function getOrCreateReferralTargetsForJob(jobId: number): ReferralTargetR
   const displayNames: Record<string, string> = {
     recruiter: "Recruiter",
     hiring_manager: "Hiring Manager",
+    team_pm_or_peer: "Team PM / Peer",
     high_signal_connector: "High-Signal Connector",
   };
 
@@ -135,6 +145,68 @@ export function getReferralTargetsForJob(jobId: number): ReferralTargetRow[] {
   return db.prepare(`${REFERRAL_SELECT} WHERE job_id = ? ORDER BY slot`).all(jobId) as ReferralTargetRow[];
 }
 
+const SLOT_ORDER: TargetType[] = ["recruiter", "hiring_manager", "team_pm_or_peer", "high_signal_connector"];
+
+/** Merge LLM targets with heuristic to fill up to 4 slots. Uses LLM per type when present; fills missing with heuristic. */
+export function mergeReferralTargetsLlmWithHeuristic(
+  jobId: number,
+  llmTargets: Array<{ target_type: string; search_query: string; why_selected: string; confidence?: number }>,
+  company: string
+): Array<{ slot: number; target_type: string; search_query: string; search_url: string; why_selected: string; confidence: number; archetype: string | null; source: string; drafted_message: string }> {
+  const ctx = getJobContext(jobId);
+  if (!ctx) return [];
+  const classification = classifyJobArchetype(ctx.title, ctx.description, ctx.location);
+  const connector = getConnectorFromPeoplePool(jobId, ctx.company);
+  const heuristicSlots = generateHeuristicTargetsV2(ctx.company, classification, connector);
+  const extId = (db.prepare("SELECT external_id FROM jobs WHERE id = ?").get(jobId) as { external_id: string | null })?.external_id ?? String(jobId);
+  const displayNames: Record<string, string> = {
+    recruiter: "Recruiter",
+    hiring_manager: "Hiring Manager",
+    team_pm_or_peer: "Team PM / Peer",
+    high_signal_connector: "High-Signal Connector",
+  };
+  function buildSearchUrl(q: string): string {
+    const encoded = encodeURIComponent(q.replace(/\s+/g, " ").trim());
+    return `https://www.google.com/search?q=${encoded}`;
+  }
+  const out: Array<{ slot: number; target_type: string; search_query: string; search_url: string; why_selected: string; confidence: number; archetype: string | null; source: string; drafted_message: string }> = [];
+  const used = new Set<number>();
+  for (let slot = 1; slot <= 4; slot++) {
+    const wantType = SLOT_ORDER[slot - 1];
+    const llmIdx = llmTargets.findIndex((t, i) => !used.has(i) && t.target_type === wantType);
+    const heuristic = heuristicSlots[slot - 1];
+    if (llmIdx >= 0) {
+      used.add(llmIdx);
+      const llm = llmTargets[llmIdx]!;
+      const search_url = buildSearchUrl(llm.search_query);
+      out.push({
+        slot,
+        target_type: wantType,
+        search_query: llm.search_query,
+        search_url,
+        why_selected: llm.why_selected,
+        confidence: typeof llm.confidence === "number" ? Math.min(100, Math.max(0, llm.confidence)) : 70,
+        archetype: classification.archetype,
+        source: "llm",
+        drafted_message: connectNote(displayNames[wantType] ?? wantType, extId),
+      });
+    } else if (heuristic) {
+      out.push({
+        slot,
+        target_type: heuristic.target_type,
+        search_query: heuristic.search_query,
+        search_url: heuristic.search_url,
+        why_selected: heuristic.why_selected,
+        confidence: heuristic.confidence,
+        archetype: heuristic.archetype,
+        source: heuristic.source,
+        drafted_message: connectNote(displayNames[heuristic.target_type] ?? heuristic.target_type, extId),
+      });
+    }
+  }
+  return out;
+}
+
 /** Save pre-built referral targets (e.g. from LLM). Replaces existing; includes search_query, confidence, archetype, source. */
 export function saveReferralTargets(
   jobId: number,
@@ -151,7 +223,7 @@ export function saveReferralTargets(
   }>
 ): void {
   const settings = getSettings();
-  const maxTargets = Math.min(Math.max(1, settings.max_targets_per_job), 3);
+  const maxTargets = Math.min(Math.max(1, settings.max_targets_per_job), 4);
   db.prepare("DELETE FROM job_referral_targets WHERE job_id = ?").run(jobId);
   const insertStmt = db.prepare(`
     INSERT INTO job_referral_targets (job_id, slot, target_type, search_query, search_url, why_selected, confidence, archetype, source, outreach_status, drafted_message)

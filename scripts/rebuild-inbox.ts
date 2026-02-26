@@ -17,8 +17,8 @@ function main() {
 }
 
 main()
-  .then((inserted) => {
-    console.log(`Rebuild complete. ${inserted} new jobs inserted (after gates + location).`);
+  .then(({ count }) => {
+    console.log(`Rebuild complete. ${count} new jobs inserted (after gates + location).`);
     process.exit(0);
   })
   .catch((e) => {

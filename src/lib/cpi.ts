@@ -1,9 +1,7 @@
 /**
  * CPI (Candidate–Role Fit Index) multi-layer scoring 0–10 for Principal GenAI product roles.
- * Layer 1: PM-aware exclusion (only exclude non-PM titles; PM token overrides exclusion words).
- * Layer 2: Role Fit Score 0–5 (product/roadmap/KPI/cross-functional/strategy/platform/ambiguity).
- * Layer 3: AI Depth Score 0–5 (genai/llm/model behavior/alignment/safety/etc.).
- * Final CPI = Role Fit + AI Depth, clamped 0–10. cpi=null only when title is not PM-eligible.
+ * Layer 1: PM-aware exclusion; Layer 2: Role Fit 0–5; Layer 3: AI Depth 0–5. CPI = Role Fit + AI Depth, clamped 0–10.
+ * tier (Top 5% / Top 20% / Reject) is legacy/back-compat; canonical is V2 bucket (final_fit_score, resume_match, bucket).
  */
 
 /** PM title tokens (case-insensitive). If title contains any of these, do not exclude for engineer/research/etc. */

@@ -112,7 +112,7 @@ Logs go to `agent.log`. The process will stop when the machine reboots unless yo
 
 Set these in `.env` in the project root (or in the process manager’s env) so both the app and the agent see them:
 
-- `OPENAI_API_KEY` — optional; when set, the agent uses the LLM to pre-warm connections for Top 5% jobs.
+- `OPENAI_API_KEY` — optional; when set, the agent uses the LLM to pre-warm connections for Apply now / Strong fit jobs.
 - `DATABASE_PATH` — optional; path to SQLite DB (default `roleradar.db` in project root).
 - `AGENT_POLL_INTERVAL_MS` — optional; interval between polls in ms (default 30 min).
 - `AGENT_ALWAYS_POLL` — default is `true` (poll 24/7). Set to `false` to poll only during the time window (e.g. 5pm–1am local).
@@ -121,6 +121,6 @@ Set these in `.env` in the project root (or in the process manager’s env) so b
 ## What the agent does each cycle
 
 1. **Poll** — Fetches enabled job sources, runs gates and CPI, inserts new jobs.
-2. **Warm connections** (if `AGENT_WARM_CONNECTIONS` is not `false`) — Finds high-fit jobs (Top 5%, Top 20%, or CPI ≥ 7) that have no referral targets yet, and creates them (heuristic search links; for Top 5%, also calls the LLM when `OPENAI_API_KEY` is set).
+2. **Warm connections** (if `AGENT_WARM_CONNECTIONS` is not `false`) — Finds jobs in bucket Apply now, Strong fit, or top Near match (resume_match ≥ 88) that have no referral targets yet, and creates them (heuristic; LLM when `OPENAI_API_KEY` set for Apply now / Strong fit).
 
 So when you open a job page, “Find connections” is already populated for new high-fit roles.

@@ -24,7 +24,7 @@ Create a `.env` file in the project root (same folder as `package.json`). Option
 # Optional: SQLite DB path (default: roleradar.db in project root)
 # DATABASE_PATH=./roleradar.db
 
-# Optional: OpenAI for LLM-generated referral targets (Top 5% jobs)
+# Optional: OpenAI for LLM-generated referral targets (Apply now / Strong fit)
 # OPENAI_API_KEY=sk-...
 ```
 
@@ -55,6 +55,16 @@ npm run seed-top-companies
 
 This adds/updates sources (e.g. Anthropic, Adobe, OpenAI, Uber). You can run `npm run seed-adobe`, `npm run seed-people`, etc. as needed (see `scripts/`).
 
+**Backfill existing jobs (scores + bucket):** If you have existing job rows without `final_fit_score` / `resume_match` / `bucket`, run once:
+
+```bash
+npm run backfill:jobs
+```
+
+Optionally limit to last 60 days: `BACKFILL_DAYS=60 npm run backfill:jobs`.
+
+**Settings:** Copy `settings.json.example` to `settings.json` to override defaults (recency_days, allow_remote, allowed_locations, etc.). Or set env vars: `RECENCY_DAYS`, `ALLOW_REMOTE`, `ALLOWED_LOCATIONS` (comma-separated), etc. See [INBOX_AND_AGENT_SPEC.md](INBOX_AND_AGENT_SPEC.md) — “How to configure settings”.
+
 ---
 
 ## Step 4: One-time poll (optional)
@@ -78,7 +88,7 @@ npm run dev
 ```
 
 - Open **http://localhost:3000** for the dashboard (jobs by company, last 7 days).
-- Open **http://localhost:3000/inbox** for the tiered Inbox (Top 5%, Top 20%, Reject) and agent status.
+- Open **http://localhost:3000/inbox** for the bucketed Inbox (Apply now, Strong fit, Near match, Review, Hidden) and agent status.
 
 Leave this terminal open while you use the app.
 
@@ -165,6 +175,7 @@ Then run `git push -u origin main` in your terminal and enter credentials when a
 | 1 | Clone + install | `git clone ... && cd roleradar && npm install` |
 | 2 | Env (optional) | Create `.env` with `OPENAI_API_KEY` etc. if needed |
 | 3 | Seed sources | `npm run seed-top-companies` |
+| 3b | Backfill jobs (if existing rows) | `npm run backfill:jobs` (or `BACKFILL_DAYS=60 npm run backfill:jobs`) |
 | 4 | One-time poll (optional) | `npm run poll` |
 | 5 | Run app | `npm run dev` → open http://localhost:3000/inbox |
 | 6 | Run agent | `npm run agent` (or PM2 / nohup / launchd; see [AGENT.md](AGENT.md)) |
@@ -174,9 +185,10 @@ Then run `git push -u origin main` in your terminal and enter credentials when a
 
 ## Where things live
 
-- **Inbox:** http://localhost:3000/inbox — tiered jobs, agent status, “next update in X min”.
-- **Dashboard:** http://localhost:3000 — jobs by company (last 7 days).
-- **Job detail:** http://localhost:3000/job/[id] — referral targets, copy buttons, “From your network”.
+- **Inbox:** http://localhost:3000/inbox — jobs by bucket (Apply now, Strong fit, Near match, Review, Hidden), agent status, “Refresh targets” when stale/not_found.
+- **Dashboard:** http://localhost:3000 — jobs by company.
+- **Job detail:** http://localhost:3000/job/[id] — bucket + scores, 4 referral target slots, copy buttons, “Refresh targets”, suggestions (Near match).
+- **Scoring fixture (dev):** `npm run test:scoring` — runs sample job descriptions and prints expected bucket + scores (local dev sanity check; not required for CI).
 - **Agent status:** Shown on Inbox; or check `.agent-last-poll` file mtime (updated after each poll).
 - **DB:** `roleradar.db` in project root (do not commit; in `.gitignore`).
 - **Requirements / agent details:** [REQUIREMENTS.md](../REQUIREMENTS.md) (§ Running the agent), [AGENT.md](AGENT.md), [SYSTEM_AND_REQUIREMENTS.md](SYSTEM_AND_REQUIREMENTS.md).

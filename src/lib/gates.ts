@@ -1,10 +1,13 @@
 /**
- * Pre-CPI gating. Run in order; only compute CPI and store if all gates pass.
- * GATE 0: Hard title exclusion → GATE 1: Must be PM → GATE 2: Seniority → GATE 3: Location → GATE 4: Description sanity.
+ * Pre-scoring gating. Only ingest Senior/Principal PM, PM-T, TPM roles. No PMM, no program/project manager.
+ * GATE 0: Hard title exclusion → GATE 1: Must be PM (product manager / PM-T / technical product) → GATE 2: Seniority → GATE 3: Location → GATE 4: Description sanity.
  */
 
-/** GATE 0 — If title contains ANY of these (case-insensitive), discard immediately. Do NOT compute CPI, do NOT store. */
+/** GATE 0 — If title contains ANY of these (case-insensitive), discard. Do NOT store. Excludes non-PM roles; "tpm" removed so Technical Product Manager is allowed. */
 export const GATE0_HARD_TITLE_EXCLUSION = [
+  "intern",
+  "contract",
+  "designer",
   "engineer",
   "developer",
   "scientist",
@@ -13,6 +16,7 @@ export const GATE0_HARD_TITLE_EXCLUSION = [
   "account",
   "marketing",
   "product marketing",
+  "pmm",
   "finance",
   "revenue",
   "tax",
@@ -25,8 +29,7 @@ export const GATE0_HARD_TITLE_EXCLUSION = [
   "success engineer",
   "forward deployed",
   "program manager",
-  "tpm",
-  "technical program",
+  "technical program manager",
   "project manager",
   "assistant",
   "business partner",
@@ -35,17 +38,27 @@ export const GATE0_HARD_TITLE_EXCLUSION = [
   "hr",
 ];
 
-/** GATE 1 — Title must contain one of these (PM role). */
+/** GATE 1 — Title must contain one of these (PM role). GPM added only when allow_gpm true (see passesTitleAndDescriptionGates). */
 export const GATE1_PM_TITLE = [
   "product manager",
   "product management",
   "technical product manager",
   "pm-t",
   "pmt",
+  "product lead",
+  "principal product",
+  "ai product",
+  "ml product",
+  "genai",
+  "gen ai",
+  "agentic",
+  "personalization",
+  "discovery",
+  "consumer",
 ];
 
-/** GATE 2 — Title must contain one of these (seniority). */
-export const GATE2_SENIORITY = ["senior", "principal", "staff"];
+/** GATE 2 — Title must contain one of these (seniority): Senior, Sr, Principal, Staff. */
+export const GATE2_SENIORITY = ["senior", "sr.", "sr ", "principal", "staff"];
 
 /** GATE 4 — If description has > this many eng-keyword hits AND no strategy/roadmap, discard. */
 const GATE4_ENG_KEYWORDS = [
@@ -87,12 +100,13 @@ export function passesGate0(title: string | null | undefined): boolean {
   return !titleContainsAny(title, GATE0_HARD_TITLE_EXCLUSION);
 }
 
-/** GATE 1 — Must be Product Manager. Returns false if title does not contain a PM term. */
-export function passesGate1(title: string | null | undefined): boolean {
-  return titleContainsAny(title, GATE1_PM_TITLE);
+/** GATE 1 — Must be Product Manager. If allowGpm true, also allow "group product manager". */
+export function passesGate1(title: string | null | undefined, allowGpm = false): boolean {
+  const list = allowGpm ? [...GATE1_PM_TITLE, "group product manager"] : GATE1_PM_TITLE;
+  return titleContainsAny(title, list);
 }
 
-/** GATE 2 — Seniority. Returns false if title does not contain senior/principal/staff. */
+/** GATE 2 — Seniority. Returns false if title does not contain senior/sr/principal. */
 export function passesGate2(title: string | null | undefined): boolean {
   return titleContainsAny(title, GATE2_SENIORITY);
 }
@@ -110,16 +124,18 @@ export function passesGate4(description: string | null | undefined): boolean {
 }
 
 /**
- * Run all gates in order. Only if true should we compute CPI and store the job.
- * GATE 3 must be applied by caller with locationMatchesAllowed(location, settings.allowed_locations).
- * Seniority (GATE 2) is optional: we include all Product Manager roles, not only Senior/Principal/Staff.
+ * Run all gates in order. Only if true should we compute score and store the job.
+ * GATE 2 (seniority) enforced. GATE 3 applied by caller via locationEligible().
+ * Pass allowGpm from settings.allow_gpm for GATE 1.
  */
 export function passesTitleAndDescriptionGates(
   title: string | null | undefined,
-  description: string | null | undefined
+  description: string | null | undefined,
+  allowGpm = false
 ): boolean {
   if (!passesGate0(title)) return false;
-  if (!passesGate1(title)) return false;
+  if (!passesGate1(title, allowGpm)) return false;
+  if (!passesGate2(title)) return false;
   if (!passesGate4(description)) return false;
   return true;
 }

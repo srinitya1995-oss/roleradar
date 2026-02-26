@@ -11,12 +11,17 @@
  *   AGENT_WINDOW_END_HOUR    - end of active window, 0-23 (default 1 = 1am)
  *   AGENT_WARM_CONNECTIONS   - "true" to pre-warm connections after each poll (default true)
  *   AGENT_ALWAYS_POLL        - "true" to ignore time window and poll 24/7 (default false)
+ *   NOTIFY_EMAIL            - your email; agent emails you when new Apply now / Strong fit / top Near match jobs are found
+ *   RESEND_API_KEY          - Resend API key (get one at resend.com); required for email
+ *   NOTIFY_FROM             - optional "Name <email@domain.com>" (default: Role Radar <onboarding@resend.dev>)
+ *   APP_BASE_URL            - optional base URL for "Open Inbox" link in email (e.g. https://yoursite.com)
  */
 
 import * as fs from "fs";
 import * as path from "path";
 import { runPoll } from "./poll";
 import { warmConnectionsForHighFitJobs } from "../src/lib/agent-warm";
+import { canSendEmail, sendJobsNotification } from "../src/lib/notify-email";
 
 const AGENT_HEARTBEAT_FILE = path.join(process.cwd(), ".agent-last-poll");
 function writeHeartbeat(): void {
@@ -51,9 +56,9 @@ function sleep(ms: number): Promise<void> {
 
 async function main() {
   console.log("RoleRadar agent started.");
-  console.log(`  Poll interval: ${POLL_INTERVAL_MS / 60000} min when active`);
+  console.log(`  Wake interval: ${POLL_INTERVAL_MS / 60000} min (per-source poll is tier-based: 30min / 2hr / daily)`);
   console.log(`  Time window: ${ALWAYS_POLL ? "24/7" : `${WINDOW_START}:00–${WINDOW_END}:00 local`}`);
-  console.log(`  Warm connections after poll: ${WARM_CONNECTIONS}`);
+  console.log(`  Warm connections after poll: ${WARM_CONNECTIONS} (APPLY_NOW, STRONG_FIT, top NEAR_MATCH)`);
   if (!ALWAYS_POLL && !inWindow()) {
     console.log("Outside active window. Waiting until window starts…");
   }
@@ -63,9 +68,22 @@ async function main() {
       const now = new Date().toISOString();
       console.log(`[${now}] Running poll…`);
       try {
-        const inserted = await runPoll();
+        const { count, inserted } = await runPoll();
         writeHeartbeat();
-        console.log(`  → ${inserted} new jobs inserted.`);
+        console.log(`  → ${count} new jobs inserted.`);
+
+        const highFit = inserted.filter(
+          (j) =>
+            j.bucket === "APPLY_NOW" ||
+            j.bucket === "STRONG_FIT" ||
+            (j.bucket === "NEAR_MATCH" && (j.resume_match ?? 0) >= 88)
+        );
+        if (highFit.length > 0 && canSendEmail()) {
+          const inboxUrl = process.env.APP_BASE_URL ? `${process.env.APP_BASE_URL}/inbox` : undefined;
+          const { ok, error } = await sendJobsNotification(highFit, inboxUrl);
+          if (ok) console.log(`  → Email sent: ${highFit.length} job(s) to NOTIFY_EMAIL.`);
+          else console.warn(`  → Email failed:`, error);
+        }
 
         if (WARM_CONNECTIONS) {
           const { warmed, failed } = await warmConnectionsForHighFitJobs();

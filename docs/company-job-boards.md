@@ -1,6 +1,8 @@
 # Top Company Job Boards – Parser Support
 
-Checked career pages for: Netflix, Adobe, Airbnb, Uber, TikTok, Google, Meta, Anthropic, OpenAI, Apple.
+**Canonical fetch strategy (company tiers, polling frequency, platform types, pre-filtering):** see **[JOB_SOURCE_FETCHING_V2_SPEC.md](JOB_SOURCE_FETCHING_V2_SPEC.md)**.
+
+Below: current parser support snapshot. Checked career pages for: Netflix, Adobe, Airbnb, Uber, TikTok, Google, Meta, Anthropic, OpenAI, Apple.
 
 ---
 

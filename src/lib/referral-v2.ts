@@ -99,7 +99,7 @@ function buildSearchUrl(query: string): string {
 
 export type HeuristicTargetV2 = {
   slot: number;
-  target_type: "recruiter" | "hiring_manager" | "high_signal_connector";
+  target_type: "recruiter" | "hiring_manager" | "team_pm_or_peer" | "high_signal_connector";
   search_query: string;
   search_url: string;
   why_selected: string;
@@ -109,7 +109,7 @@ export type HeuristicTargetV2 = {
 };
 
 /**
- * Heuristic v2: Slot1 recruiter (company + role_family + location), Slot2 hiring manager (head/director/gpm + team), Slot3 connector (people pool or ex Amazon + product + team).
+ * Heuristic v2: 4 slots per CONNECTIONS_LOGIC_V2_SPEC — Recruiter, Hiring Manager, Team PM/Peer, High-Signal Connector.
  */
 export function generateHeuristicTargetsV2(
   company: string,
@@ -144,10 +144,22 @@ export function generateHeuristicTargetsV2(
     source: "heuristic",
   };
 
-  let slot3: HeuristicTargetV2;
+  const slot3Query = `${company} product manager ${team}${loc} LinkedIn`.trim();
+  const slot3: HeuristicTargetV2 = {
+    slot: 3,
+    target_type: "team_pm_or_peer",
+    search_query: slot3Query,
+    search_url: buildSearchUrl(slot3Query),
+    why_selected: `Team PM or peer in ${team}; same org / adjacent PM for warm intro.`,
+    confidence: 55,
+    archetype: classification.archetype,
+    source: "heuristic",
+  };
+
+  let slot4: HeuristicTargetV2;
   if (connectorFromPeoplePool) {
-    slot3 = {
-      slot: 3,
+    slot4 = {
+      slot: 4,
       target_type: "high_signal_connector",
       search_query: connectorFromPeoplePool.search_query,
       search_url: buildSearchUrl(connectorFromPeoplePool.search_query),
@@ -157,12 +169,12 @@ export function generateHeuristicTargetsV2(
       source: "heuristic",
     };
   } else {
-    const slot3Query = `${company} ex Amazon Principal Product Manager ${team} LinkedIn`.trim();
-    slot3 = {
-      slot: 3,
+    const slot4Query = `${company} ex Amazon Principal Product Manager ${team} LinkedIn`.trim();
+    slot4 = {
+      slot: 4,
       target_type: "high_signal_connector",
-      search_query: slot3Query,
-      search_url: buildSearchUrl(slot3Query),
+      search_query: slot4Query,
+      search_url: buildSearchUrl(slot4Query),
       why_selected: `Ex-Amazon PM at ${company} for referral and shared context; high-signal connector.`,
       confidence: 55,
       archetype: classification.archetype,
@@ -170,5 +182,5 @@ export function generateHeuristicTargetsV2(
     };
   }
 
-  return [slot1, slot2, slot3];
+  return [slot1, slot2, slot3, slot4];
 }

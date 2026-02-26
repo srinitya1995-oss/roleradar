@@ -1,5 +1,9 @@
 # CPI (Candidate–Role Fit Index) Logic
 
+**LEGACY.** CPI and tier (0–10, Top 5% / Top 20% / Reject) are written for backward compatibility. Canonical scoring is **V2**: `final_fit_score`, `resume_match`, **bucket** (APPLY_NOW / STRONG_FIT / NEAR_MATCH / REVIEW / HIDE). See [INBOX_AND_AGENT_SPEC.md](INBOX_AND_AGENT_SPEC.md) and [CONNECTIONS_LOGIC_V2_SPEC.md](CONNECTIONS_LOGIC_V2_SPEC.md).
+
+---
+
 Source: `src/lib/cpi.ts`
 
 ## CPI overview
