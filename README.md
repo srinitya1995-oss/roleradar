@@ -1,8 +1,10 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# RoleRadar
+
+Selective job aggregation and fit-scoring for Principal GenAI PM roles, with referral-ready copy and connection targets.
 
 ## Getting Started
 
-First, run the development server:
+### Dev server
 
 ```bash
 npm run dev
@@ -14,11 +16,36 @@ pnpm dev
 bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) (or the port shown) for the dashboard. Jobs are grouped by company; click a role to see connections and referral copy.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Agent (background job hunter)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+The agent polls job sources on a schedule and pre-warms referral connections for high-fit jobs so they’re ready when you open a job page.
+
+```bash
+npm run agent
+```
+
+Leave it running in a terminal, or run it as a real service (see [docs/AGENT.md](docs/AGENT.md)):
+
+- **PM2** (Node): `pm2 start npm --name roleradar-agent -- run agent`
+- **launchd** (macOS): use the plist in `docs/AGENT.md`
+
+Env (optional):
+
+| Env | Default | Description |
+|-----|---------|-------------|
+| `AGENT_POLL_INTERVAL_MS` | 30 min | Minutes between polls when active |
+| `AGENT_WINDOW_START_HOUR` | 17 | Start of active window (5pm) |
+| `AGENT_WINDOW_END_HOUR` | 1 | End of active window (1am) |
+| `AGENT_WARM_CONNECTIONS` | true | Pre-warm connections for Top 5% / Top 20% jobs after each poll |
+| `AGENT_ALWAYS_POLL` | false | Set to `true` to poll 24/7 (ignore time window) |
+
+### Other commands
+
+- `npm run poll` — one-time poll of all enabled job sources
+- `npm run rebuild-inbox` — clear jobs and referral targets, then poll
+- `npm run seed-top-companies` — seed job sources (e.g. Anthropic, Adobe, OpenAI)
 
 ## Learn More
 

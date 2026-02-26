@@ -3,22 +3,36 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --hostname 127.0.0.1 --webpack",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "poll": "tsx scripts/poll.ts",
+    "agent": "tsx scripts/agent.ts",
+    "seed-people": "tsx scripts/seed-people.ts",
+    "seed-adobe": "tsx scripts/seed-adobe.ts",
+    "seed-top-companies": "tsx scripts/seed-top-companies.ts",
+    "rebuild-inbox": "tsx scripts/rebuild-inbox.ts",
+    "test": "vitest run"
   },
   "dependencies": {
+    "axios": "^1.13.5",
+    "better-sqlite3": "^12.6.2",
+    "cheerio": "^1.2.0",
     "next": "16.1.6",
     "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react-dom": "19.2.3",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
-    "typescript": "^5"
+    "tsx": "^4.21.0",
+    "typescript": "^5",
+    "vitest": "^3.2.4"
   }
 }
