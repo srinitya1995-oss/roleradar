@@ -169,7 +169,14 @@ async function main() {
   process.exit(0);
 }
 
-main().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+// Only run main when this file is executed directly (e.g. npm run poll), not when imported by agent
+const isPollRunDirectly =
+  typeof process !== "undefined" &&
+  process.argv[1] &&
+  (process.argv[1].endsWith("poll.ts") || process.argv[1].includes("scripts/poll"));
+if (isPollRunDirectly) {
+  main().catch((e) => {
+    console.error(e);
+    process.exit(1);
+  });
+}
