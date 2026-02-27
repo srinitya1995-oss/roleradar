@@ -1,8 +1,10 @@
 /**
  * Fit scoring stack: Role Relevance (0-40), AI Depth (0-30), Domain Fit (0-20), Penalties (0-30).
  * FINAL_FIT_SCORE = clamp(R + AI + Domain - Penalty, 0, 100).
- * Deterministic keyword-based; no LLM.
+ * All comparisons use normalized text (→ to " to ", hyphens to space, strip +$(), lowercase).
  */
+
+import { normalizeForMatch } from "./normalize";
 
 /** Role Relevance: PM ownership, roadmap, metrics, cross-functional, platform/API, launch (max 40). */
 const ROLE_GROUPS: { keywords: string[]; points: number }[] = [
@@ -44,11 +46,10 @@ const PENALTY_TERMS: { keywords: string[]; points: number }[] = [
   { keywords: ["pure operations", "non-product ops"], points: 5 },
 ];
 
-function scoreGroups(text: string, groups: { keywords: string[]; points: number }[], cap: number): number {
-  const lower = text.toLowerCase();
+function scoreGroups(normalizedText: string, groups: { keywords: string[]; points: number }[], cap: number): number {
   let total = 0;
   for (const g of groups) {
-    const found = g.keywords.some((kw) => lower.includes(kw));
+    const found = g.keywords.some((kw) => normalizedText.includes(normalizeForMatch(kw)));
     if (found) total += g.points;
   }
   return Math.min(cap, total);
@@ -58,32 +59,32 @@ function scoreGroups(text: string, groups: { keywords: string[]; points: number 
  * Compute Role Relevance Score 0-40 from job description.
  */
 export function roleRelevanceScore(description: string | null | undefined): number {
-  const text = (description ?? "").trim();
-  return text ? scoreGroups(text, ROLE_GROUPS, 40) : 0;
+  const norm = normalizeForMatch(description ?? "");
+  return norm ? scoreGroups(norm, ROLE_GROUPS, 40) : 0;
 }
 
 /**
  * Compute AI Depth Score 0-30 from job description.
  */
 export function aiDepthScore(description: string | null | undefined): number {
-  const text = (description ?? "").trim();
-  return text ? scoreGroups(text, AI_TERMS, 30) : 0;
+  const norm = normalizeForMatch(description ?? "");
+  return norm ? scoreGroups(norm, AI_TERMS, 30) : 0;
 }
 
 /**
  * Compute Domain Fit Score 0-20 from job description.
  */
 export function domainFitScore(description: string | null | undefined): number {
-  const text = (description ?? "").trim();
-  return text ? scoreGroups(text, DOMAIN_TERMS, 20) : 0;
+  const norm = normalizeForMatch(description ?? "");
+  return norm ? scoreGroups(norm, DOMAIN_TERMS, 20) : 0;
 }
 
 /**
  * Compute Penalty 0-30 from title + description (wrong function, seniority, etc.).
  */
 export function penaltyScore(title: string | null | undefined, description: string | null | undefined): number {
-  const text = [title ?? "", description ?? ""].join(" ").trim().toLowerCase();
-  return text ? scoreGroups(text, PENALTY_TERMS, 30) : 0;
+  const norm = normalizeForMatch([title ?? "", description ?? ""].join(" "));
+  return norm ? scoreGroups(norm, PENALTY_TERMS, 30) : 0;
 }
 
 /**

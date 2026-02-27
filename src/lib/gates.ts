@@ -77,26 +77,29 @@ const GATE4_ENG_THRESHOLD = 5;
 const GATE4_STRATEGY_TERMS_NORMALIZED = ["product strategy", "roadmap"];
 
 function titleContainsAny(title: string | null | undefined, terms: string[]): boolean {
-  const t = (title ?? "").toLowerCase();
-  return terms.some((kw) => t.includes(kw.toLowerCase()));
+  const norm = normalizeForMatch(title ?? "");
+  return terms.some((kw) => norm.includes(normalizeForMatch(kw)));
 }
 
-/** True if title is PM-T or Technical Product Manager (bypasses Gate 4 eng-keyword penalty). */
+/** True if title suggests technical/senior PM (bypass Gate 4 eng-keyword penalty). */
 function isTechnicalPmTitle(title: string | null | undefined): boolean {
   const norm = normalizeForMatch(title ?? "");
   return (
-    norm.includes("technical product manager") ||
+    norm.includes("technical") ||
     norm.includes("pm-t") ||
-    norm.includes("pmt ")
+    norm.includes("pmt") ||
+    norm.includes("senior")
   );
 }
 
 function countOccurrences(text: string, terms: string[]): number {
-  const lower = text.toLowerCase();
+  const norm = normalizeForMatch(text);
   let count = 0;
   for (const kw of terms) {
-    const re = new RegExp(kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
-    const m = lower.match(re);
+    const n = normalizeForMatch(kw);
+    if (!n) continue;
+    const re = new RegExp(n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
+    const m = norm.match(re);
     if (m) count += m.length;
   }
   return count;

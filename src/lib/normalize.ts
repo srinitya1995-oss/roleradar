@@ -3,13 +3,18 @@
  * 0→1, 0-to-1, zero to one, and similar variants all match.
  */
 
-/** Strip punctuation (except allowed), replace → with "to", collapse whitespace, lowercase. */
+/**
+ * Semantic normalization for matching: → to " to ", hyphens to space, strip special
+ * characters (+, $, parentheses, etc.), collapse whitespace, lowercase.
+ * Apply to job title, description, and every keyword/surface list before comparison.
+ */
 export function normalizeForMatch(text: string | null | undefined): string {
   if (text == null) return "";
   let s = String(text)
     .replace(/\u2192/g, " to ")   // →
     .replace(/\u2013|\u2014/g, " ") // en/em dash
-    .replace(/[^\w\s-]/g, " ")   // strip punctuation (keep alphanumeric, space, hyphen)
+    .replace(/-/g, " ")          // hyphens to space so "0-to-1" matches "0 to 1"
+    .replace(/[^\w\s]/g, " ")    // strip + $ ( ) and other special chars
     .replace(/\s+/g, " ")
     .trim()
     .toLowerCase();

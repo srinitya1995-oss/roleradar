@@ -50,7 +50,8 @@ export function getJobsPayload(): {
   jobsByCompany: { company: string; jobs: unknown[] }[];
 } {
   const settings = getSettings();
-  // Jobs from last 7 days; age_group: new = last 1h, last_24h = 1h–24h, older = older than 24h
+  // Inbox list: jobs posted in the last 7 days
+  const recencyDays = 7;
   const oneHourAgoIso = new Date(Date.now() - 60 * 60 * 1000).toISOString();
   const oneHourAgo = oneHourAgoIso.slice(0, 19).replace("T", " ");
   const oneDayAgoIso = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
@@ -59,7 +60,7 @@ export function getJobsPayload(): {
   SELECT j.id, j.title, j.location, j.url, j.external_id, j.cpi, j.tier, j.description, j.created_at, j.posted_at, j.reposted_at, j.first_seen_at, j.final_fit_score, j.resume_match, j.bucket, COALESCE(j.company, s.company) as company
   FROM jobs j
   LEFT JOIN job_sources s ON j.source_id = s.id
-  WHERE (COALESCE(j.reposted_at, j.posted_at, j.first_seen_at, j.created_at) >= datetime('now', '-7 days'))
+  WHERE (COALESCE(j.reposted_at, j.posted_at, j.first_seen_at, j.created_at) >= datetime('now', '-${recencyDays} days'))
   ORDER BY COALESCE(j.reposted_at, j.posted_at, j.first_seen_at, j.created_at) DESC, j.final_fit_score DESC NULLS LAST, j.cpi DESC NULLS LAST, j.id DESC
 `).all() as JobRow[];
 

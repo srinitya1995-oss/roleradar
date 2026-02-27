@@ -59,92 +59,26 @@ export const candidateProfile: CandidateProfile = {
 };
 
 /**
- * Category-based surface matching: JD doesn't say "Amazon Rufus", but if it has
- * Shopping + AI or E-commerce + Conversational, we count it as that surface.
- * Each category lists alternative token-pairs; if any pair is present (both tokens
- * in normalized text), the surface gets credit.
+ * Surface alias mapping: JDs won't say "Amazon Rufus" or "Alexa Reasoning".
+ * If the normalized JD contains any alias from a category, grant that surface points.
  */
-const SURFACE_CATEGORIES: { surface: string; tokenPairs: string[][] }[] = [
-  {
-    surface: "Alexa Generative AI",
-    tokenPairs: [
-      ["conversational", "ai"],
-      ["conversational", "generative"],
-      ["assistant", "llm"],
-      ["voice", "ai"],
-      ["alexa", "ai"],
-    ],
-  },
-  {
-    surface: "conversational shopping",
-    tokenPairs: [
-      ["conversational", "shopping"],
-      ["shopping", "ai"],
-      ["e-commerce", "conversational"],
-      ["ecommerce", "conversational"],
-      ["conversational", "commerce"],
-    ],
-  },
-  {
-    surface: "reasoning infrastructure",
-    tokenPairs: [
-      ["reasoning", "infrastructure"],
-      ["reasoning", "scale"],
-      ["reasoning", "systems"],
-      ["inference", "reasoning"],
-    ],
-  },
-  {
-    surface: "multimodal experiences",
-    tokenPairs: [
-      ["multimodal", "experience"],
-      ["multimodal", "experiences"],
-      ["multimodal", "product"],
-      ["vision", "language"],
-    ],
-  },
-  {
-    surface: "evaluation frameworks",
-    tokenPairs: [
-      ["reasoning", "accuracy"],
-      ["evaluation", "benchmarks"],
-      ["evaluation", "metrics"],
-      ["eval", "benchmark"],
-      ["red team", "model"],
-      ["model", "evaluation"],
-    ],
-  },
-  {
-    surface: "LLM-powered surfaces",
-    tokenPairs: [
-      ["llm", "surface"],
-      ["llm", "surfaces"],
-      ["generative", "product"],
-      ["language model", "product"],
-      ["llm", "product"],
-    ],
-  },
-  {
-    surface: "Amazon Rufus",
-    tokenPairs: [
-      ["shopping", "ai"],
-      ["e-commerce", "conversational"],
-      ["ecommerce", "conversational"],
-      ["search", "generative"],
-      ["commerce", "llm"],
-    ],
-  },
-];
+const SURFACE_ALIASES: Record<string, string[]> = {
+  "Amazon Rufus": ["shopping", "e-commerce", "ecommerce", "consumer ai", "retail", "commerce"],
+  "Alexa Generative AI": ["agentic", "assistant", "llm reasoning", "multi-step", "multistep", "conversational ai", "voice ai", "alexa"],
+  "conversational shopping": ["conversational", "shopping", "e-commerce", "ecommerce", "commerce"],
+  "reasoning infrastructure": ["reasoning", "infrastructure", "inference", "multi-step", "multistep"],
+  "multimodal experiences": ["multimodal", "vision", "language", "experience", "experiences"],
+  "evaluation frameworks": ["benchmarks", "red teaming", "red team", "accuracy metrics", "evals", "evaluation", "eval"],
+  "LLM-powered surfaces": ["llm", "generative", "language model", "surface", "surfaces", "product"],
+};
 
-function normalizedTextContainsTokenPair(norm: string, pair: string[]): boolean {
-  const [a, b] = pair.map((p) => normalizeForMatch(p));
-  return norm.includes(a) && norm.includes(b);
-}
-
-function countCategorySurfaceHits(normalizedText: string): number {
+function countSurfaceAliasHits(normalizedText: string): number {
   let hits = 0;
-  for (const { tokenPairs } of SURFACE_CATEGORIES) {
-    const matched = tokenPairs.some((pair) => normalizedTextContainsTokenPair(normalizedText, pair));
+  for (const aliases of Object.values(SURFACE_ALIASES)) {
+    const matched = aliases.some((alias) => {
+      const n = normalizeForMatch(alias);
+      return n && normalizedText.includes(n);
+    });
     if (matched) hits += 1;
   }
   return hits;
@@ -190,12 +124,13 @@ export function profileMatchScore(
     (keywordHits / Math.max(profile.backgroundKeywords.length, 1)) * maxKeywordScore
   );
 
-  // Surface score (40 max): category-based. Count how many surface categories the JD matches.
+  // Surface score (40 max): alias-based. If JD contains any alias from a surface category, grant points.
   const maxSurfaceScore = 40;
-  const surfaceCategoryHits = countCategorySurfaceHits(norm);
+  const surfaceAliasHits = countSurfaceAliasHits(norm);
+  const numSurfaces = Object.keys(SURFACE_ALIASES).length;
   const surfaceScore = Math.min(
     maxSurfaceScore,
-    (surfaceCategoryHits / Math.max(SURFACE_CATEGORIES.length, 1)) * maxSurfaceScore
+    (surfaceAliasHits / Math.max(numSurfaces, 1)) * maxSurfaceScore
   );
 
   const score = keywordScore + surfaceScore;
