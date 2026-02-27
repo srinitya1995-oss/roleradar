@@ -7,18 +7,14 @@ export type Bucket = "APPLY_NOW" | "STRONG_FIT" | "NEAR_MATCH" | "REVIEW" | "HID
 
 /**
  * Compute bucket from resume match and fit score.
- * Recalibrated for keyword-based matcher (JDs often shorter than resume).
- * APPLY_NOW: resume >= 80 AND fit >= 80
- * STRONG_FIT: resume >= 70 AND fit >= 75
- * NEAR_MATCH: resume >= 60 AND fit >= 65
- * REVIEW: resume >= 50
- * HIDE: < 50 or fails gates
+ * Calibrated so PM roles at top companies (OpenAI, Adobe, Uber) surface to Apply now / Strong fit
+ * even when descriptions are short or title-heavy (e.g. "Product Manager, API Agents").
  */
 export function computeBucket(resumeMatch: number, finalFitScore: number): Bucket {
-  if (resumeMatch >= 80 && finalFitScore >= 80) return "APPLY_NOW";
-  if (resumeMatch >= 70 && finalFitScore >= 75) return "STRONG_FIT";
-  if (resumeMatch >= 60 && finalFitScore >= 65) return "NEAR_MATCH";
-  if (resumeMatch >= 50) return "REVIEW";
+  if (resumeMatch >= 55 && finalFitScore >= 55) return "APPLY_NOW";
+  if (resumeMatch >= 45 && finalFitScore >= 45) return "STRONG_FIT";
+  if (resumeMatch >= 35 && finalFitScore >= 35) return "NEAR_MATCH";
+  if (resumeMatch >= 25) return "REVIEW";
   return "HIDE";
 }
 

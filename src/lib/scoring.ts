@@ -56,26 +56,37 @@ function scoreGroups(normalizedText: string, groups: { keywords: string[]; point
 }
 
 /**
- * Compute Role Relevance Score 0-40 from job description.
+ * Score from title + description so PM roles with short/empty descriptions (e.g. "Product Manager, API Agents")
+ * still get role/AI/domain credit from the title.
  */
-export function roleRelevanceScore(description: string | null | undefined): number {
-  const norm = normalizeForMatch(description ?? "");
+function textForScoring(title: string | null | undefined, description: string | null | undefined): string {
+  return [title ?? "", description ?? ""].join(" ").trim();
+}
+
+/**
+ * Compute Role Relevance Score 0-40 from title + description.
+ */
+export function roleRelevanceScore(description: string | null | undefined, title?: string | null): number {
+  const text = title != null ? textForScoring(title, description) : (description ?? "");
+  const norm = normalizeForMatch(text);
   return norm ? scoreGroups(norm, ROLE_GROUPS, 40) : 0;
 }
 
 /**
- * Compute AI Depth Score 0-30 from job description.
+ * Compute AI Depth Score 0-30 from title + description.
  */
-export function aiDepthScore(description: string | null | undefined): number {
-  const norm = normalizeForMatch(description ?? "");
+export function aiDepthScore(description: string | null | undefined, title?: string | null): number {
+  const text = title != null ? textForScoring(title, description) : (description ?? "");
+  const norm = normalizeForMatch(text);
   return norm ? scoreGroups(norm, AI_TERMS, 30) : 0;
 }
 
 /**
- * Compute Domain Fit Score 0-20 from job description.
+ * Compute Domain Fit Score 0-20 from title + description.
  */
-export function domainFitScore(description: string | null | undefined): number {
-  const norm = normalizeForMatch(description ?? "");
+export function domainFitScore(description: string | null | undefined, title?: string | null): number {
+  const text = title != null ? textForScoring(title, description) : (description ?? "");
+  const norm = normalizeForMatch(text);
   return norm ? scoreGroups(norm, DOMAIN_TERMS, 20) : 0;
 }
 
@@ -94,9 +105,9 @@ export function computeFinalFitScore(
   title: string | null | undefined,
   description: string | null | undefined
 ): number {
-  const role = roleRelevanceScore(description);
-  const ai = aiDepthScore(description);
-  const domain = domainFitScore(description);
+  const role = roleRelevanceScore(description, title);
+  const ai = aiDepthScore(description, title);
+  const domain = domainFitScore(description, title);
   const penalty = penaltyScore(title, description);
   const raw = role + ai + domain - penalty;
   return Math.max(0, Math.min(100, Math.round(raw)));

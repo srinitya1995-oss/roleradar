@@ -1,7 +1,9 @@
 /**
- * Location normalization and policy. CA + Seattle only; no remote-only unless allow_remote.
- * Hybrid tied to allowed city is OK.
+ * Location normalization and policy. CA + Seattle + USA; no remote-only unless allow_remote.
+ * Uses normalize() so "San Francisco, CA" matches allowed "CA" or "San Francisco".
  */
+
+import { normalizeForMatch } from "./normalize";
 
 export type LocationParse = {
   raw_location: string;
@@ -33,8 +35,9 @@ export function parseLocation(location: string | null | undefined): LocationPars
 }
 
 /**
- * Job is location-eligible if: (allowed city/state match) OR (remote-only and (allow_remote OR "Remote" in allowed list)).
- * Hybrid with an allowed city is OK (substring match on raw).
+ * Job is location-eligible if: (allowed city/state/country match) OR (remote-only and (allow_remote OR "Remote" in allowed list)).
+ * Uses normalize() so job location "San Francisco, CA" passes when allowed has "CA" or "San Francisco".
+ * If the normalized job location contains any normalized allowed_locations substring, PASS.
  */
 export function locationEligible(
   location: string | null | undefined,
@@ -42,12 +45,15 @@ export function locationEligible(
   allowRemote: boolean
 ): boolean {
   const parsed = parseLocation(location);
-  // Boards often omit location in the feed; allow so we don't drop those listings
   if (!parsed.raw_location) return true;
-  if (parsed.is_remote_only) {
-    const allowedByList = allowedLocations.some((a) => a.trim().toLowerCase() && parsed.raw_location.toLowerCase().includes(a.trim().toLowerCase()));
-    return allowRemote || allowedByList;
-  }
-  const lower = parsed.raw_location.toLowerCase();
-  return allowedLocations.some((a) => a.trim().toLowerCase() && lower.includes(a.trim().toLowerCase()));
+
+  const normLocation = normalizeForMatch(location);
+  const allowedMatch = (): boolean =>
+    allowedLocations.some((a) => {
+      const normAllowed = normalizeForMatch(a);
+      return normAllowed.length > 0 && normLocation.includes(normAllowed);
+    });
+
+  if (parsed.is_remote_only) return allowRemote || allowedMatch();
+  return allowedMatch();
 }

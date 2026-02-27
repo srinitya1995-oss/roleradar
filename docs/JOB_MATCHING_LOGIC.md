@@ -57,32 +57,31 @@ So with defaults, a job whose location is **only** "Remote" or "Anywhere" (and n
 **Inputs:** Job title, job description, allow GPM (group product manager), allow junior PM.  
 **Output:** true = pass (continue to scoring); false = discard.
 
-All checks are **case-insensitive** on title/description.
+**Normalization:** Title and all keyword lists are **normalized** before comparison: replace → with " to ", hyphens with space, strip `+ $ ( )` and other non-word chars, collapse whitespace, lowercase. So "0→1" and "0-to-1" both match.
 
 **GATE 0 — Hard title exclusion**
 
 - If title is null/empty/whitespace → return **false**.
-- If title **contains** (substring) **any** of the following → return **false**:
+- If **normalized** title **contains** (substring) **any** normalized exclusion term → return **false**:
   - "intern", "contract", "designer", "engineer", "developer", "scientist", "research", "sales", "account", "marketing", "product marketing", "pmm", "finance", "revenue", "tax", "accounting", "operations", "procurement", "sourcing", "solutions engineer", "deployment", "success engineer", "forward deployed", "program manager", "technical program manager", "project manager", "assistant", "business partner", "compliance", "legal", "hr".
 
 **GATE 1 — Must be PM role**
 
-- Title **must contain** at least **one** of:
-  - "product manager", "product management", "technical product manager", "pm-t", "pmt", "product lead", "principal product", "ai product", "ml product", "genai", "gen ai", "agentic", "personalization", "discovery", "consumer".
+- **Normalized** title **must contain** at least **one** normalized term from: "product manager", "product management", "technical product manager", "pm-t", "pmt", "product lead", "principal product", "ai product", "ml product", "genai", "gen ai", "agentic", "personalization", "discovery", "consumer".
 - If `allowGpm === true`, also allow: "group product manager".
 - Else → return **false**.
 
 **GATE 2 — Seniority** (skipped when `allowJuniorPm === true`)
 
-- Title **must contain** at least **one** of: "senior", "sr.", "sr ", "principal", "staff".
+- **Normalized** title **must contain** at least **one** of: "senior", "sr.", "sr ", "principal", "staff".
 - Else → return **false**.
 
 **GATE 4 — Description sanity (avoid pure eng roles)**
 
 - If description is null/empty/whitespace → **true** (allow).
-- If title is **Technical Product Manager** or **PM-T** / **PMT** (normalized check) → **true** (bypass; no eng-keyword penalty).
-- Else: count **total occurrences** (regex, case-insensitive) of these terms in description: "code", "coding", "python", "java", "c++", "implementation", "debugging".
-- Strategy check uses **normalized** description: if normalized text contains normalized "product strategy" or "roadmap" → `hasStrategy = true`; else false.
+- **Bypass:** If **normalized** title contains **any** of: "technical", "pm-t", "pmt", "senior" → **true** (no eng-keyword penalty).
+- Else: count **total occurrences** in **normalized** description of: "code", "coding", "python", "java", "c++", "implementation", "debugging".
+- Strategy: **normalized** description contains normalized "product strategy" or "roadmap" → `hasStrategy = true`.
 - If `engCount > 5` **and** `!hasStrategy` → return **false**; else **true**.
 
 **Defaults:** `allow_gpm` = false, `allow_junior_pm` = false (env `ALLOW_GPM`, `ALLOW_JUNIOR_PM` or settings.json).
@@ -176,12 +175,19 @@ Penalty total capped at 30. Final: `raw = role + ai + domain - penalty`, then `r
 
 **Logic (semantic matcher: normalization, synonyms, category surfaces):**
 
-- **Normalization:** Text is normalized (→ to "to", strip punctuation, collapse whitespace, lowercase) before matching.
-- **Keyword score (60 max):** Each background keyword matches if normalized text contains it or any **synonym** (e.g. GenAI = generative ai = llm; 0→1 = 0-to-1 = zero to one = launch; PM-T = technical product manager = pmt). Fuzzy token match (tokens within distance) also counts.
-- **Surface score (40 max):** **Category-based**, not exact string. E.g. "Amazon Rufus" surface gets credit if JD has (shopping + ai) or (e-commerce + conversational); "evaluation frameworks" if (reasoning + accuracy) or (evaluation + benchmarks). See `SURFACE_CATEGORIES` in profile.ts.
+- **Normalization:** Text is normalized (→ to " to ", hyphens to space, strip +$(), lowercase) before matching.
+- **Keyword score (60 max):** Each background keyword matches if normalized text contains it or any **synonym** (GenAI = generative ai = llm; 0→1 = 0-to-1 = zero to one = launch; PM-T = technical product manager = pmt). Fuzzy token match (tokens within distance) also counts.
+- **Surface score (40 max):** **Alias-based.** If normalized JD contains **any** alias from a surface category, that surface gets 1 hit. Aliases:
+  - **Amazon Rufus:** shopping, e-commerce, ecommerce, consumer ai, retail, commerce
+  - **Alexa Generative AI:** agentic, assistant, llm reasoning, multi-step, multistep, conversational ai, voice ai, alexa
+  - **conversational shopping:** conversational, shopping, e-commerce, ecommerce, commerce
+  - **reasoning infrastructure:** reasoning, infrastructure, inference, multi-step, multistep
+  - **multimodal experiences:** multimodal, vision, language, experience, experiences
+  - **evaluation frameworks:** benchmarks, red teaming, red team, accuracy metrics, evals, evaluation, eval
+  - **LLM-powered surfaces:** llm, generative, language model, surface, surfaces, product
 - `score` = keywordScore + surfaceScore; return `round(clamp(score, 0, 100))`.
 
-No LLM; deterministic keyword/semantic overlap.
+No LLM; deterministic.
 
 ---
 

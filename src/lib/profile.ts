@@ -59,11 +59,11 @@ export const candidateProfile: CandidateProfile = {
 };
 
 /**
- * Surface alias mapping: JDs won't say "Amazon Rufus" or "Alexa Reasoning".
- * If the normalized JD contains any alias from a category, grant that surface points.
+ * Surface alias mapping: JDs won't say "Amazon Rufus". If the JD mentions shopping/retail/ecommerce
+ * (e.g. at OpenAI), grant Rufus surface credit. Normalized JD vs normalized alias.
  */
 const SURFACE_ALIASES: Record<string, string[]> = {
-  "Amazon Rufus": ["shopping", "e-commerce", "ecommerce", "consumer ai", "retail", "commerce"],
+  "Amazon Rufus": ["shopping", "retail", "ecommerce", "e-commerce", "consumer ai", "commerce"],
   "Alexa Generative AI": ["agentic", "assistant", "llm reasoning", "multi-step", "multistep", "conversational ai", "voice ai", "alexa"],
   "conversational shopping": ["conversational", "shopping", "e-commerce", "ecommerce", "commerce"],
   "reasoning infrastructure": ["reasoning", "infrastructure", "inference", "multi-step", "multistep"],
