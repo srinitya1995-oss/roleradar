@@ -118,3 +118,10 @@ function migrateJobsV2Scoring(): void {
     "UPDATE jobs SET first_seen_at = COALESCE(first_seen_at, created_at), last_seen_at = COALESCE(last_seen_at, created_at) WHERE first_seen_at IS NULL OR last_seen_at IS NULL"
   );
 }
+
+function migrateJobsTrackingStatus(): void {
+  const cols = db.prepare("PRAGMA table_info(jobs)").all() as { name: string }[];
+  if (!cols.some((c) => c.name === "tracking_status"))
+    db.exec("ALTER TABLE jobs ADD COLUMN tracking_status TEXT");
+}
+migrateJobsTrackingStatus();

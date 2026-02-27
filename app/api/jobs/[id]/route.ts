@@ -182,11 +182,22 @@ export async function PATCH(
     return NextResponse.json({ error: "Invalid job id" }, { status: 400 });
   }
 
-  let body: { person_id?: number; slot?: number; outreach_status: string };
+  let body: { person_id?: number; slot?: number; outreach_status?: string; tracking_status?: string | null };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
+  const { tracking_status: trackingStatus } = body;
+  if (trackingStatus !== undefined) {
+    const allowed = [null, "asked_for_referral", "applied", "interviewing", "declined"];
+    const value = trackingStatus === null || trackingStatus === "" ? null : trackingStatus;
+    if (value !== null && !allowed.includes(value)) {
+      return NextResponse.json({ error: "Invalid tracking_status" }, { status: 400 });
+    }
+    db.prepare("UPDATE jobs SET tracking_status = ? WHERE id = ?").run(value, id);
+    return NextResponse.json({ ok: true, tracking_status: value });
   }
 
   const { person_id: personId, slot, outreach_status: outreachStatus } = body;

@@ -13,9 +13,11 @@
     "seed-people": "tsx scripts/seed-people.ts",
     "seed-adobe": "tsx scripts/seed-adobe.ts",
     "seed-top-companies": "tsx scripts/seed-top-companies.ts",
+    "seed-type4": "tsx scripts/seed-type4-sources.ts",
     "setup": "tsx scripts/setup-and-poll.ts",
     "rebuild-inbox": "tsx scripts/rebuild-inbox.ts",
     "backfill:jobs": "tsx scripts/backfill-jobs.ts",
+    "hydrate:jobs": "tsx scripts/hydrate-jobs.ts",
     "test": "vitest run",
     "test:scoring": "tsx tests/scoring-fixture.ts"
   },

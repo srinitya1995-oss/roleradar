@@ -1,74 +1,107 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { connectNote, referralMessage } from "@/src/lib/messages";
+import Link from "next/link";
 
-export type Job = { id: number; title: string | null; location: string | null; url: string | null; external_id: string | null; cpi?: number | null; tier?: string | null; bucket?: string | null; connection_status?: string; company?: string | null };
+export type Job = {
+  id: number;
+  title: string | null;
+  location: string | null;
+  url: string | null;
+  external_id: string | null;
+  bucket?: string | null;
+  company?: string | null;
+  profile_match_pct?: number | null;
+  final_fit_score?: number | null;
+  connection_status?: string;
+  connection_targets?: { type_label: string; why_selected: string; search_url?: string }[];
+  tracking_status?: string | null;
+};
 
-function CopyButton({ text, label }: { text: string; label: string }) {
-  const [copied, setCopied] = useState(false);
-  const copy = () => {
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
+const TRACKING_OPTIONS = [
+  { value: "", label: "—" },
+  { value: "asked_for_referral", label: "Asked for referral" },
+  { value: "applied", label: "Applied" },
+  { value: "interviewing", label: "Interviewing" },
+  { value: "declined", label: "Declined" },
+];
+
+function JobRow({
+  job,
+  onTrackingChange,
+}: {
+  job: Job;
+  onTrackingChange: (jobId: number, value: string | null) => void;
+}) {
+  const resumePct = job.profile_match_pct != null ? Math.round(job.profile_match_pct) : null;
+  const fitScore = job.final_fit_score != null ? Math.round(job.final_fit_score) : null;
+  const connectionLabel = job.connection_status === "found" ? "Found" : job.connection_status === "not_found" ? "Not found" : job.connection_status === "stale" ? "Stale" : "—";
+  const trackingValue = job.tracking_status ?? "";
+
   return (
-    <button type="button" onClick={copy} className="copy-btn">
-      {copied ? "Copied" : label}
-    </button>
+    <tr className="inbox-job-row">
+      <td className="inbox-col-title">
+        <a href={job.url ?? "#"} target="_blank" rel="noopener noreferrer" className="inbox-title-link">
+          {job.title ?? "Untitled"}
+        </a>
+      </td>
+      <td className="inbox-col-company">{job.company ?? "—"}</td>
+      <td className="inbox-col-location">{job.location ?? "—"}</td>
+      <td className="inbox-col-resume">{resumePct != null ? `${resumePct}%` : "—"}</td>
+      <td className="inbox-col-fit">{fitScore != null ? fitScore : "—"}</td>
+      <td className="inbox-col-connection">
+        <Link href={`/job/${job.id}`} className="inbox-connection-link">
+          {connectionLabel}
+        </Link>
+      </td>
+      <td className="inbox-col-tracking">
+        <select
+          value={trackingValue}
+          onChange={(e) => onTrackingChange(job.id, e.target.value === "" ? null : e.target.value)}
+          className="inbox-tracking-select"
+          aria-label="Tracking status"
+        >
+          {TRACKING_OPTIONS.map((opt) => (
+            <option key={opt.value || "_"} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+      </td>
+    </tr>
   );
 }
 
-/** LinkedIn People search: Product Managers who used to work at Amazon (company ID 1586). Optionally narrow by current company name in keywords. */
-function linkedInFormerAmazoniansUrl(companyName: string | null | undefined): string {
-  const base = "https://www.linkedin.com/search/results/people/?keywords=Product%20Manager&pastCompany=%221586%22";
-  const company = (companyName ?? "").trim();
-  if (!company) return base;
-  return `${base}&keywords=Product%20Manager%20${encodeURIComponent(company)}`;
-}
-
-function JobCard({ job, recruiterName = "there" }: { job: Job; recruiterName?: string }) {
-  const jobId = job.external_id ?? String(job.id);
-  const connect = connectNote(recruiterName, jobId);
-  const referral = referralMessage(recruiterName, jobId);
-  const showRefresh = job.connection_status === "stale" || job.connection_status === "not_found";
-  const showConnectionsLink = job.bucket === "APPLY_NOW" || job.bucket === "STRONG_FIT";
-  const connectionsUrl = linkedInFormerAmazoniansUrl(job.company);
-  return (
-    <article className="job-card">
-      <div className="job-header">
-        <h3><a href={job.url ?? "#"} target="_blank" rel="noopener noreferrer">{job.title ?? "Untitled"}</a></h3>
-        {job.location && <span className="location">{job.location}</span>}
-        {job.bucket && <span className="bucket-badge">{job.bucket}</span>}
-      </div>
-      <div className="job-actions">
-        <CopyButton text={connect} label="Copy connect note" />
-        <CopyButton text={referral} label="Copy referral ask" />
-        {showConnectionsLink && (
-          <a href={connectionsUrl} target="_blank" rel="noopener noreferrer" className="connections-link">
-            Find former Amazonians at this company
-          </a>
-        )}
-        {showRefresh && (
-          <a href={`/job/${job.id}?refresh_targets=1`} className="refresh-targets-link">Refresh targets</a>
-        )}
-      </div>
-    </article>
-  );
-}
-
-function TierSection({ title, jobs }: { title: string; jobs: Job[] }) {
+function InboxTable({ jobs, onTrackingChange }: { jobs: Job[]; onTrackingChange: (jobId: number, value: string | null) => void }) {
   if (jobs.length === 0) return null;
   return (
-    <section className="tier-section">
-      <h2>{title} ({jobs.length})</h2>
-      <ul className="job-list">
+    <table className="inbox-table">
+      <thead>
+        <tr>
+          <th className="inbox-col-title">Job title</th>
+          <th className="inbox-col-company">Company</th>
+          <th className="inbox-col-location">Location</th>
+          <th className="inbox-col-resume">Resume match</th>
+          <th className="inbox-col-fit">Fit score</th>
+          <th className="inbox-col-connection">Connection</th>
+          <th className="inbox-col-tracking">Tracking status</th>
+        </tr>
+      </thead>
+      <tbody>
         {jobs.map((job) => (
-          <li key={job.id}>
-            <JobCard job={job} />
-          </li>
+          <JobRow key={job.id} job={job} onTrackingChange={onTrackingChange} />
         ))}
-      </ul>
+      </tbody>
+    </table>
+  );
+}
+
+function TierSection({ title, jobs, onTrackingChange }: { title: string; jobs: Job[]; onTrackingChange: (jobId: number, value: string | null) => void }) {
+  if (jobs.length === 0) return null;
+  return (
+    <section className="inbox-tier-section">
+      <h2 className="inbox-tier-title">{title} ({jobs.length})</h2>
+      <InboxTable jobs={jobs} onTrackingChange={onTrackingChange} />
     </section>
   );
 }
@@ -96,7 +129,6 @@ type InboxData = {
   other?: Job[];
 };
 
-/** Server can pass unknown[]; we normalize to Job[] on first render. */
 function toInboxData(raw: {
   top5?: unknown[];
   top20?: unknown[];
@@ -152,7 +184,36 @@ export default function InboxClient({
       .catch((e) => {
         if (!silent) setError(e.name === "AbortError" ? "Request timed out" : (e.message || "Failed to load jobs"));
       })
-      .finally(() => { clearTimeout(t); if (!silent) setLoading(false); });
+      .finally(() => {
+        clearTimeout(t);
+        if (!silent) setLoading(false);
+      });
+  }, []);
+
+  const updateTracking = useCallback((jobId: number, value: string | null) => {
+    fetch(`/api/jobs/${jobId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tracking_status: value }),
+    })
+      .then((r) => {
+        if (!r.ok) throw new Error("Failed to update");
+        return r.json();
+      })
+      .then(() => {
+        setData((prev) => {
+          const update = (jobs: Job[]) =>
+            jobs.map((j) => (j.id === jobId ? { ...j, tracking_status: value } : j));
+          return {
+            top5: update(prev.top5 ?? []),
+            top20: update(prev.top20 ?? []),
+            rejectedRelevantOnly: update(prev.rejectedRelevantOnly ?? []),
+            reject: update(prev.reject ?? []),
+            other: update(prev.other ?? []),
+          };
+        });
+      })
+      .catch(() => setError("Failed to update tracking status"));
   }, []);
 
   useEffect(() => {
@@ -163,7 +224,7 @@ export default function InboxClient({
   useEffect(() => {
     const fetchStatus = () => {
       fetch("/api/agent-status")
-        .then((r) => r.ok ? r.json() : { live: false, lastPollAt: null, pollIntervalMs: 30 * 60 * 1000 })
+        .then((r) => (r.ok ? r.json() : { live: false, lastPollAt: null, pollIntervalMs: 30 * 60 * 1000 }))
         .then(setAgentStatus)
         .catch(() => setAgentStatus((s) => ({ ...s, live: false, lastPollAt: null })));
     };
@@ -177,8 +238,12 @@ export default function InboxClient({
       : null;
 
   const hasAnyJobs =
-    (data.top5?.length ?? 0) + (data.top20?.length ?? 0) +
-    (data.rejectedRelevantOnly?.length ?? 0) + (data.reject?.length ?? 0) + (data.other?.length ?? 0) > 0;
+    (data.top5?.length ?? 0) +
+    (data.top20?.length ?? 0) +
+    (data.rejectedRelevantOnly?.length ?? 0) +
+    (data.reject?.length ?? 0) +
+    (data.other?.length ?? 0) >
+    0;
 
   return (
     <main className="inbox-page">
@@ -186,13 +251,17 @@ export default function InboxClient({
       {loading && (
         <p className="inbox-loading" style={{ marginBottom: "1rem" }}>
           Refreshing…
-          <button type="button" onClick={() => loadJobs(false)} className="inbox-refresh-btn" style={{ marginLeft: "0.75rem" }}>Refresh</button>
+          <button type="button" onClick={() => loadJobs(false)} className="inbox-refresh-btn" style={{ marginLeft: "0.75rem" }}>
+            Refresh
+          </button>
         </p>
       )}
       {error && (
         <p className="inbox-error" style={{ marginBottom: "1rem" }}>
           {error}
-          <button type="button" onClick={() => loadJobs(false)} className="inbox-refresh-btn" style={{ marginLeft: "0.75rem" }}>Try again</button>
+          <button type="button" onClick={() => loadJobs(false)} className="inbox-refresh-btn" style={{ marginLeft: "0.75rem" }}>
+            Try again
+          </button>
         </p>
       )}
       <p className="agent-status" aria-live="polite">
@@ -200,35 +269,29 @@ export default function InboxClient({
           <>
             Agent: <strong>Live</strong>
             {" · "}
-            jobs from last run
-            {" · "}
             last poll {agentStatus.lastPollAt ? formatMinutesAgo(agentStatus.lastPollAt) : "—"}
             {nextMin !== null && (
-              <> · next update in <strong>{nextMin} min</strong></>
+              <>
+                {" · "}
+                next update in <strong>{nextMin} min</strong>
+              </>
             )}
           </>
         ) : (
-          <>Agent: <strong>Not running</strong> · run <code>npm run agent</code> (or <code>npm run dev:full</code>) to search jobs and warm connections</>
+          <>
+            Agent: <strong>Not running</strong> · run <code>npm run agent</code> to search jobs and warm connections
+          </>
         )}
       </p>
-      <TierSection title="Apply now" jobs={data.top5 ?? []} />
-      <TierSection title="Strong fit" jobs={data.top20 ?? []} />
-      <TierSection title="Near match" jobs={data.rejectedRelevantOnly ?? []} />
-      <TierSection title="Review" jobs={data.reject ?? []} />
-      <TierSection title="Hidden" jobs={data.other ?? []} />
+      <TierSection title="Apply now" jobs={data.top5 ?? []} onTrackingChange={updateTracking} />
+      <TierSection title="Strong fit" jobs={data.top20 ?? []} onTrackingChange={updateTracking} />
+      <TierSection title="Near match" jobs={data.rejectedRelevantOnly ?? []} onTrackingChange={updateTracking} />
+      <TierSection title="Review" jobs={data.reject ?? []} onTrackingChange={updateTracking} />
+      <TierSection title="Hidden" jobs={data.other ?? []} onTrackingChange={updateTracking} />
       {!hasAnyJobs && !loading && (
         <section className="inbox-empty" style={{ marginTop: "1.5rem", padding: "1.25rem", background: "#f5f5f5", borderRadius: "8px", maxWidth: "32rem" }}>
           <h2 style={{ marginTop: 0, fontSize: "1.1rem" }}>No jobs yet</h2>
-          <p style={{ margin: "0.5rem 0", color: "#444" }}>
-            Seed job sources, then fetch jobs. In the project root run:
-          </p>
-          <pre style={{ margin: "0.75rem 0", padding: "0.75rem", background: "#fff", borderRadius: "4px", overflow: "auto", fontSize: "0.9rem" }}>
-            npm run seed-top-companies{"\n"}
-            npm run poll
-          </pre>
-          <p style={{ margin: "0.5rem 0", color: "#666", fontSize: "0.95rem" }}>
-            Then refresh this page. To <strong>search jobs and warm connections automatically</strong>, run the agent: <code>npm run agent</code> (in another terminal) or <code>npm run dev:full</code> (app + agent together). For people recommendations, run <code>npm run seed-people</code>.
-          </p>
+          <p style={{ margin: "0.5rem 0", color: "#444" }}>Run <code>npm run seed-type4</code> and <code>npm run poll</code>, then refresh.</p>
         </section>
       )}
     </main>

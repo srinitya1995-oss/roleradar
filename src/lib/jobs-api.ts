@@ -26,6 +26,7 @@ export type JobRow = {
   final_fit_score: number | null;
   resume_match: number | null;
   bucket: string | null;
+  tracking_status: string | null;
 };
 
 function normalizeTitle(title: string | null | undefined): string {
@@ -57,7 +58,7 @@ export function getJobsPayload(): {
   const oneDayAgoIso = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   const oneDayAgo = oneDayAgoIso.slice(0, 19).replace("T", " ");
   const rows = db.prepare(`
-  SELECT j.id, j.title, j.location, j.url, j.external_id, j.cpi, j.tier, j.description, j.created_at, j.posted_at, j.reposted_at, j.first_seen_at, j.final_fit_score, j.resume_match, j.bucket, COALESCE(j.company, s.company) as company
+  SELECT j.id, j.title, j.location, j.url, j.external_id, j.cpi, j.tier, j.description, j.created_at, j.posted_at, j.reposted_at, j.first_seen_at, j.final_fit_score, j.resume_match, j.bucket, j.tracking_status, COALESCE(j.company, s.company) as company
   FROM jobs j
   LEFT JOIN job_sources s ON j.source_id = s.id
   WHERE (COALESCE(j.reposted_at, j.posted_at, j.first_seen_at, j.created_at) >= datetime('now', '-${recencyDays} days'))
@@ -86,18 +87,23 @@ export function getJobsPayload(): {
   const allJobs = [...apply_now, ...strong_fit, ...near_match, ...review, ...hide];
 
   const jobIds = allJobs.map((r) => r.id);
-  const targetsByJob: Record<number, { target_type: string; why_selected: string; confidence: number | null }[]> = {};
+  const targetsByJob: Record<number, { target_type: string; why_selected: string; confidence: number | null; search_url: string }[]> = {};
   const targetsOldestCreatedAt: Record<number, string | null> = {};
   if (jobIds.length > 0) {
     const placeholders = jobIds.map(() => "?").join(",");
     const targetRows = db
       .prepare(
-        `SELECT job_id, slot, target_type, why_selected, confidence, created_at FROM job_referral_targets WHERE job_id IN (${placeholders}) ORDER BY job_id, slot`
+        `SELECT job_id, slot, target_type, search_url, why_selected, confidence, created_at FROM job_referral_targets WHERE job_id IN (${placeholders}) ORDER BY job_id, slot`
       )
-      .all(...jobIds) as { job_id: number; target_type: string; why_selected: string; confidence: number | null; created_at: string | null }[];
+      .all(...jobIds) as { job_id: number; target_type: string; search_url: string; why_selected: string; confidence: number | null; created_at: string | null }[];
     for (const t of targetRows) {
       if (!targetsByJob[t.job_id]) targetsByJob[t.job_id] = [];
-      targetsByJob[t.job_id].push({ target_type: t.target_type, why_selected: t.why_selected, confidence: t.confidence ?? null });
+      targetsByJob[t.job_id].push({
+        target_type: t.target_type,
+        why_selected: t.why_selected,
+        confidence: t.confidence ?? null,
+        search_url: t.search_url ?? "",
+      });
       const existing = targetsOldestCreatedAt[t.job_id];
       if (!existing || (t.created_at && t.created_at < existing)) targetsOldestCreatedAt[t.job_id] = t.created_at ?? null;
     }
@@ -142,6 +148,7 @@ export function getJobsPayload(): {
               type_label: targetTypeLabel(t.target_type),
               why_selected: t.why_selected,
               confidence: t.confidence,
+              search_url: t.search_url,
             }))
           : [];
       const date_posted = r.reposted_at ?? r.posted_at ?? r.first_seen_at ?? r.created_at ?? null;
@@ -169,6 +176,7 @@ export function getJobsPayload(): {
         final_fit_score,
         connection_status,
         connection_targets,
+        tracking_status: r.tracking_status ?? null,
       };
     });
 
