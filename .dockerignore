@@ -1,0 +1,13 @@
+node_modules
+.next
+.git
+.gitignore
+.env*
+roleradar.db
+roleradar.db-*
+.agent-last-poll
+agent.log
+*.md
+docs
+coverage
+.DS_Store

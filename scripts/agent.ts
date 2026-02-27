@@ -68,12 +68,18 @@ async function main() {
     console.log("Outside active window. Waiting until window starts…");
   }
 
+  let firstWake = true;
   while (true) {
     if (inWindow()) {
       const now = new Date().toISOString();
       console.log(`[${now}] Running poll…`);
       try {
-        const { count, inserted } = await runPoll();
+        const forceAll = firstWake;
+        if (firstWake) {
+          firstWake = false;
+          console.log("  (First run: force poll all sources for fresh jobs.)");
+        }
+        const { count, inserted } = await runPoll(forceAll);
         writeHeartbeat();
         console.log(`  → ${count} new jobs inserted.`);
 

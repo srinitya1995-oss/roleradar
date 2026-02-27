@@ -29,7 +29,7 @@ type JobRow = {
   created_at?: string | null;
   posted_at?: string | null;
   first_seen_at?: string | null;
-  company?: string | null;
+  company: string | null;
   bucket: string | null;
   final_fit_score: number | null;
   resume_match: number | null;
@@ -65,27 +65,30 @@ export async function GET(
     db.prepare("DELETE FROM job_referral_targets WHERE job_id = ?").run(id);
   }
 
-  let referral_targets: Array<{
-    slot: number;
-    target_type: string;
-    search_url: string;
-    why_selected: string;
-    confidence: number | null;
-    archetype: string | null;
-    source: string | null;
-    outreach_status: string;
-    drafted_message: string;
-    created_at: string | null;
-  }> = [];
+  const loadTargetsFromDb = () => {
+    const targetRowsWithCreated = db
+      .prepare("SELECT job_id, slot, target_type, search_url, why_selected, confidence, archetype, source, outreach_status, drafted_message, created_at FROM job_referral_targets WHERE job_id = ? ORDER BY slot")
+      .all(id) as Array<{ created_at: string | null } & Record<string, unknown>>;
+    return targetRowsWithCreated.map((t) => ({
+      slot: t.slot as number,
+      target_type: t.target_type as string,
+      search_url: t.search_url as string,
+      why_selected: t.why_selected as string,
+      confidence: (t.confidence as number | null) ?? null,
+      archetype: (t.archetype as string | null) ?? null,
+      source: (t.source as string | null) ?? null,
+      outreach_status: t.outreach_status as string,
+      drafted_message: t.drafted_message as string,
+      created_at: t.created_at ?? null,
+    }));
+  };
 
-  const shouldAutoGenerate = eligible || refreshTargets;
-  if (shouldAutoGenerate) {
-    const existingTargets = getReferralTargetsForJob(id);
-    const useLLM =
-      Boolean(process.env.OPENAI_API_KEY) &&
-      (refreshTargets || existingTargets.length === 0);
+  let referral_targets = loadTargetsFromDb();
 
-    if (useLLM && existingTargets.length === 0) {
+  const shouldEnsureTargets = eligible || refreshTargets;
+  if (shouldEnsureTargets && referral_targets.length === 0) {
+    const useLLM = Boolean(process.env.OPENAI_API_KEY);
+    if (useLLM) {
       try {
         const jobDetail = db
           .prepare(
@@ -110,25 +113,10 @@ export async function GET(
         // fall through to heuristic
       }
     }
-
-    const targets = getReferralTargetsForJob(id).length > 0
-      ? getReferralTargetsForJob(id)
-      : getOrCreateReferralTargetsForJob(id);
-    const targetRowsWithCreated = db
-      .prepare("SELECT job_id, slot, target_type, search_url, why_selected, confidence, archetype, source, outreach_status, drafted_message, created_at FROM job_referral_targets WHERE job_id = ? ORDER BY slot")
-      .all(id) as Array<{ created_at: string | null } & Record<string, unknown>>;
-    referral_targets = targetRowsWithCreated.map((t) => ({
-      slot: t.slot as number,
-      target_type: t.target_type as string,
-      search_url: t.search_url as string,
-      why_selected: t.why_selected as string,
-      confidence: (t.confidence as number | null) ?? null,
-      archetype: (t.archetype as string | null) ?? null,
-      source: (t.source as string | null) ?? null,
-      outreach_status: t.outreach_status as string,
-      drafted_message: t.drafted_message as string,
-      created_at: t.created_at ?? null,
-    }));
+    if (referral_targets.length === 0) {
+      getOrCreateReferralTargetsForJob(id);
+    }
+    referral_targets = loadTargetsFromDb();
   }
 
   const oldestTargetCreated = referral_targets.length > 0
@@ -136,10 +124,14 @@ export async function GET(
     : null;
   const staleCutoff = new Date(Date.now() - settings.target_stale_days * 24 * 60 * 60 * 1000).toISOString();
   let connection_status: string;
-  if (!eligible) connection_status = "n/a";
-  else if (referral_targets.length === 0) connection_status = "not_found";
-  else if (oldestTargetCreated && oldestTargetCreated < staleCutoff) connection_status = "stale";
-  else connection_status = "found";
+  if (referral_targets.length > 0) {
+    connection_status = oldestTargetCreated && oldestTargetCreated < staleCutoff ? "stale" : "found";
+  } else if (eligible) {
+    connection_status = "not_found";
+  } else {
+    connection_status = "n/a";
+  }
+  const eligible_for_connections = eligible || (job.company != null && String(job.company).trim() !== "");
 
   let suggestions: Array<{ emphasize: string; where: string; example: string }> = [];
   try {
@@ -176,7 +168,7 @@ export async function GET(
     })),
     referral_targets,
     connection_status,
-    eligible_for_connections: eligible,
+    eligible_for_connections,
     suggestions,
   });
 }

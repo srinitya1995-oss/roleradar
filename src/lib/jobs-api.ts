@@ -50,12 +50,16 @@ export function getJobsPayload(): {
   jobsByCompany: { company: string; jobs: unknown[] }[];
 } {
   const settings = getSettings();
-  // Jobs from past day (reposted_at/posted_at/first_seen_at/created_at)
+  // Jobs from last 7 days; age_group: new = last 1h, last_24h = 1h–24h, older = older than 24h
+  const oneHourAgoIso = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  const oneHourAgo = oneHourAgoIso.slice(0, 19).replace("T", " ");
+  const oneDayAgoIso = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const oneDayAgo = oneDayAgoIso.slice(0, 19).replace("T", " ");
   const rows = db.prepare(`
-  SELECT j.id, j.title, j.location, j.url, j.external_id, j.cpi, j.tier, j.description, j.created_at, j.posted_at, j.reposted_at, j.first_seen_at, j.final_fit_score, j.resume_match, j.bucket, s.company
+  SELECT j.id, j.title, j.location, j.url, j.external_id, j.cpi, j.tier, j.description, j.created_at, j.posted_at, j.reposted_at, j.first_seen_at, j.final_fit_score, j.resume_match, j.bucket, COALESCE(j.company, s.company) as company
   FROM jobs j
   LEFT JOIN job_sources s ON j.source_id = s.id
-  WHERE (COALESCE(j.reposted_at, j.posted_at, j.first_seen_at, j.created_at) >= datetime('now', '-1 days'))
+  WHERE (COALESCE(j.reposted_at, j.posted_at, j.first_seen_at, j.created_at) >= datetime('now', '-7 days'))
   ORDER BY COALESCE(j.reposted_at, j.posted_at, j.first_seen_at, j.created_at) DESC, j.final_fit_score DESC NULLS LAST, j.cpi DESC NULLS LAST, j.id DESC
 `).all() as JobRow[];
 
@@ -139,6 +143,12 @@ export function getJobsPayload(): {
               confidence: t.confidence,
             }))
           : [];
+      const date_posted = r.reposted_at ?? r.posted_at ?? r.first_seen_at ?? r.created_at ?? null;
+      let age_group: "new" | "last_24h" | "older" = "older";
+      if (date_posted) {
+        if (date_posted >= oneHourAgo) age_group = "new";
+        else if (date_posted >= oneDayAgo) age_group = "last_24h";
+      }
       return {
         id: r.id,
         title: r.title,
@@ -148,7 +158,9 @@ export function getJobsPayload(): {
         cpi: r.cpi,
         tier: r.tier,
         company: r.company ?? null,
-        date_posted: r.reposted_at ?? r.posted_at ?? r.first_seen_at ?? r.created_at ?? null,
+        date_posted,
+        is_new: age_group === "new",
+        age_group,
         match_label: matchLabel(r, resumeMatch, final_fit_score),
         profile_match_pct: resumeMatch,
         match_pct,

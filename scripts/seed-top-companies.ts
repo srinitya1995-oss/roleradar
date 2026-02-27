@@ -12,6 +12,9 @@ const SOURCES: { company: string; url: string; parser: string }[] = [
   { company: "Airbnb", url: "https://boards.greenhouse.io/airbnb", parser: "greenhouse" },
   { company: "Uber", url: "https://boards.greenhouse.io/uberfreight", parser: "greenhouse" },
   { company: "OpenAI", url: "https://jobs.ashbyhq.com/openai", parser: "ashby" },
+  { company: "LinkedIn", url: "Product Manager", parser: "linkedin" },
+  { company: "Adzuna", url: "Product Manager", parser: "adzuna" },
+  { company: "JSearch", url: "Product Manager", parser: "jsearch" },
 ];
 
 const insert = db.prepare(

@@ -16,6 +16,9 @@ import { parseLeverBoard } from "../src/lib/parsers/lever";
 import { parseAshbyBoard } from "../src/lib/parsers/ashby";
 import { parseSmartRecruitersBoard } from "../src/lib/parsers/smartrecruiters";
 import { parseWorkdayBoard } from "../src/lib/parsers/workday";
+import { parseLinkedInJobs } from "../src/lib/parsers/linkedin";
+import { parseAdzunaJobs } from "../src/lib/parsers/adzuna";
+import { parseJSearchJobs } from "../src/lib/parsers/jsearch";
 import { passesTitleAndDescriptionGates } from "../src/lib/gates";
 import { getSettings } from "../src/lib/settings";
 import { locationEligible } from "../src/lib/location";
@@ -26,7 +29,7 @@ import { profileMatchScore } from "../src/lib/profile";
 import { generateSuggestionsForNearMatch } from "../src/lib/suggestions";
 
 type JobSource = { id: number; company: string; url: string; parser: string; company_tier: number | null; last_polled_at: string | null };
-type ParsedJob = { title: string; url: string; location: string; external_id: string; description?: string; posted_at?: string | null };
+type ParsedJob = { title: string; url: string; location: string; external_id: string; description?: string; posted_at?: string | null; company?: string };
 
 const parsers: Record<string, (url: string) => Promise<ParsedJob[]>> = {
   greenhouse: parseGreenhouseBoard,
@@ -34,11 +37,14 @@ const parsers: Record<string, (url: string) => Promise<ParsedJob[]>> = {
   ashby: parseAshbyBoard,
   smartrecruiters: parseSmartRecruitersBoard,
   workday: parseWorkdayBoard,
+  linkedin: parseLinkedInJobs,
+  adzuna: parseAdzunaJobs,
+  jsearch: parseJSearchJobs,
 };
 
 const insertJob = db.prepare(`
-  INSERT INTO jobs (source_id, external_id, title, location, url, description, cpi, tier, created_at, posted_at, first_seen_at, last_seen_at, final_fit_score, resume_match, bucket, suggestions_json)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?, datetime('now'), datetime('now'), ?, ?, ?, ?)
+  INSERT INTO jobs (source_id, external_id, title, location, url, description, cpi, tier, created_at, posted_at, first_seen_at, last_seen_at, final_fit_score, resume_match, bucket, suggestions_json, company)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?, datetime('now'), datetime('now'), ?, ?, ?, ?, ?)
 `);
 
 function getExistingExternalIds(sourceId: number): Set<string> {
@@ -133,13 +139,14 @@ export async function runPoll(forceAll = false): Promise<{ count: number; insert
           resume_match,
           bucket,
           suggestions_json,
+          job.company ?? null,
         );
         existing.add(job.external_id);
         insertedThisSource++;
         totalInserted++;
         inserted.push({
           title: job.title ?? "",
-          company: source.company,
+          company: job.company ?? source.company,
           location: job.location ?? "",
           url: job.url ?? "",
           final_fit_score,

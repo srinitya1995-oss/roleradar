@@ -28,6 +28,10 @@ Create a `.env` file in the project root (same folder as `package.json`). Option
 
 # Optional: OpenAI for LLM-generated referral targets (Apply now / Strong fit)
 # OPENAI_API_KEY=sk-...
+# SERPAPI_API_KEY=...        # LinkedIn jobs via SerpApi Google Jobs
+# RAPIDAPI_KEY=...           # JSearch (LinkedIn/Indeed/etc.) — subscribe at rapidapi.com/letscrape-6bRBa3QguO5/api/jsearch
+# ADZUNA_APP_ID=...          # Adzuna job search (developer.adzuna.com/signup)
+# ADZUNA_APP_KEY=...
 ```
 
 **Agent (optional):**
@@ -64,6 +68,8 @@ npm run backfill:jobs
 ```
 
 Optionally limit to last 60 days: `BACKFILL_DAYS=60 npm run backfill:jobs`.
+
+**Job APIs (optional):** For LinkedIn and Adzuna job sources, set `SERPAPI_API_KEY` and/or `ADZUNA_APP_ID` + `ADZUNA_APP_KEY` in `.env`. See [JOB_APIS.md](JOB_APIS.md).
 
 **Settings:** Copy `settings.json.example` to `settings.json` to override defaults (recency_days, allow_remote, allowed_locations, etc.). Or set env vars: `RECENCY_DAYS`, `ALLOW_REMOTE`, `ALLOWED_LOCATIONS` (comma-separated), etc. See [INBOX_AND_AGENT_SPEC.md](INBOX_AND_AGENT_SPEC.md) — “How to configure settings”.
 
@@ -193,4 +199,5 @@ Then run `git push -u origin main` in your terminal and enter credentials when a
 - **Scoring fixture (dev):** `npm run test:scoring` — runs sample job descriptions and prints expected bucket + scores (local dev sanity check; not required for CI).
 - **Agent status:** Shown on Inbox; or check `.agent-last-poll` file mtime (updated after each poll).
 - **DB:** `roleradar.db` in project root (do not commit; in `.gitignore`).
+- **Deploy (Docker, Railway, VPS):** [DEPLOY.md](DEPLOY.md).
 - **Requirements / agent details:** [REQUIREMENTS.md](../REQUIREMENTS.md) (§ Running the agent), [AGENT.md](AGENT.md), [SYSTEM_AND_REQUIREMENTS.md](SYSTEM_AND_REQUIREMENTS.md).

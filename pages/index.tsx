@@ -12,6 +12,8 @@ type Job = {
   external_id: string | null;
   company?: string | null;
   date_posted?: string | null;
+  is_new?: boolean;
+  age_group?: "new" | "last_24h" | "older";
   bucket?: string | null;
   match_label?: string;
   match_pct?: number;
@@ -95,7 +97,7 @@ function JobRow({ job, companyColor }: { job: Job; companyColor: string }) {
         <span className={`match-badge match-${(job.match_label ?? "Review").toLowerCase().replace(/\s+/g, "-").replace(/[()]/g, "")}`}>
           {job.match_label ?? "Review"}
         </span>
-        {job.match_pct != null && <span className="match-pct">{job.match_pct}%</span>}
+        {job.match_pct != null && <><span className="match-pct"> {job.match_pct}%</span></>}
       </td>
     </tr>
   );
@@ -163,6 +165,22 @@ export default function Home() {
 
   const hasAny = data && data.jobsByCompany.some((s) => s.jobs.length > 0);
 
+  const newByCompany = data
+    ? data.jobsByCompany
+        .map(({ company, jobs }) => ({ company, jobs: jobs.filter((j) => j.age_group === "new") }))
+        .filter((s) => s.jobs.length > 0)
+    : [];
+  const last24ByCompany = data
+    ? data.jobsByCompany
+        .map(({ company, jobs }) => ({ company, jobs: jobs.filter((j) => j.age_group === "last_24h") }))
+        .filter((s) => s.jobs.length > 0)
+    : [];
+  const olderByCompany = data
+    ? data.jobsByCompany
+        .map(({ company, jobs }) => ({ company, jobs: jobs.filter((j) => j.age_group === "older") }))
+        .filter((s) => s.jobs.length > 0)
+    : [];
+
   return (
     <>
       <Head>
@@ -189,9 +207,30 @@ export default function Home() {
         )}
         {data && hasAny && (
           <div className="dashboard-sections">
-            {data.jobsByCompany.map(({ company, jobs }) => (
-              <CompanySection key={company} company={company} jobs={jobs} />
-            ))}
+            {newByCompany.length > 0 && (
+              <section className="dashboard-time-section">
+                <h2 className="dashboard-time-heading">New (last hour)</h2>
+                {newByCompany.map(({ company, jobs }) => (
+                  <CompanySection key={`new-${company}`} company={company} jobs={jobs} />
+                ))}
+              </section>
+            )}
+            {last24ByCompany.length > 0 && (
+              <section className="dashboard-time-section">
+                <h2 className="dashboard-time-heading">Last 24 hours</h2>
+                {last24ByCompany.map(({ company, jobs }) => (
+                  <CompanySection key={`24h-${company}`} company={company} jobs={jobs} />
+                ))}
+              </section>
+            )}
+            {olderByCompany.length > 0 && (
+              <section className="dashboard-time-section">
+                <h2 className="dashboard-time-heading">Older (older than 24 hours)</h2>
+                {olderByCompany.map(({ company, jobs }) => (
+                  <CompanySection key={`old-${company}`} company={company} jobs={jobs} />
+                ))}
+              </section>
+            )}
           </div>
         )}
       </div>
@@ -206,6 +245,8 @@ export default function Home() {
         .inbox-empty { color: #666; margin-top: 1rem; }
         .inbox-empty code { background: #eee; padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.875rem; }
         .dashboard-sections { display: flex; flex-direction: column; gap: 2rem; }
+        .dashboard-time-section { display: flex; flex-direction: column; gap: 1.25rem; }
+        .dashboard-time-heading { font-size: 1.15rem; font-weight: 600; margin: 0 0 0.5rem 0; color: #374151; }
         .company-section { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden; }
         .company-heading { font-size: 1.1rem; margin: 0; padding: 0.75rem 1rem; font-weight: 700; }
         .company-table-wrap { overflow-x: auto; }

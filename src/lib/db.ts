@@ -107,6 +107,7 @@ function migrateJobsV2Scoring(): void {
   if (!cols.some((c) => c.name === "first_seen_at")) db.exec("ALTER TABLE jobs ADD COLUMN first_seen_at TEXT");
   if (!cols.some((c) => c.name === "last_seen_at")) db.exec("ALTER TABLE jobs ADD COLUMN last_seen_at TEXT");
   if (!cols.some((c) => c.name === "reposted_at")) db.exec("ALTER TABLE jobs ADD COLUMN reposted_at TEXT");
+  if (!cols.some((c) => c.name === "company")) db.exec("ALTER TABLE jobs ADD COLUMN company TEXT");
   if (!cols.some((c) => c.name === "final_fit_score")) db.exec("ALTER TABLE jobs ADD COLUMN final_fit_score INTEGER");
   if (!cols.some((c) => c.name === "resume_match")) db.exec("ALTER TABLE jobs ADD COLUMN resume_match INTEGER");
   if (!cols.some((c) => c.name === "bucket")) db.exec("ALTER TABLE jobs ADD COLUMN bucket TEXT");
