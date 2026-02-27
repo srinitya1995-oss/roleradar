@@ -59,16 +59,28 @@ export const candidateProfile: CandidateProfile = {
 };
 
 /**
- * Surface alias mapping: JDs won't say "Amazon Rufus". If the JD mentions shopping/retail/ecommerce
- * (e.g. at OpenAI), grant Rufus surface credit. Normalized JD vs normalized alias.
+ * Surface alias mapping ("Pedigree" bonus): JDs won't say "Amazon Rufus". Grant surface credit when JD mentions:
+ * - Siri, Assistant, Agentic → Conversational Reasoning (Alexa AI)
+ * - Shopping, Retail, Discovery, Commerce → Amazon Rufus
+ * - Benchmarks, Metrics, Accuracy → Evaluation Frameworks
+ * Normalized JD vs normalized alias.
  */
 const SURFACE_ALIASES: Record<string, string[]> = {
-  "Amazon Rufus": ["shopping", "retail", "ecommerce", "e-commerce", "consumer ai", "commerce"],
-  "Alexa Generative AI": ["agentic", "assistant", "llm reasoning", "multi-step", "multistep", "conversational ai", "voice ai", "alexa"],
+  "Amazon Rufus": [
+    "shopping", "retail", "ecommerce", "e-commerce", "consumer ai", "commerce", "discovery",
+    "gemini shopping", "shopping agent", "google shopping", "tiktok shop",
+  ],
+  "Alexa Generative AI": [
+    "agentic", "assistant", "llm reasoning", "multi-step", "multistep", "conversational ai", "voice ai", "alexa",
+    "siri", "apple intelligence", "conversational reasoning",
+  ],
   "conversational shopping": ["conversational", "shopping", "e-commerce", "ecommerce", "commerce"],
   "reasoning infrastructure": ["reasoning", "infrastructure", "inference", "multi-step", "multistep"],
   "multimodal experiences": ["multimodal", "vision", "language", "experience", "experiences"],
-  "evaluation frameworks": ["benchmarks", "red teaming", "red team", "accuracy metrics", "evals", "evaluation", "eval"],
+  "evaluation frameworks": [
+    "benchmarks", "red teaming", "red team", "accuracy metrics", "evals", "evaluation", "eval",
+    "metrics", "accuracy",
+  ],
   "LLM-powered surfaces": ["llm", "generative", "language model", "surface", "surfaces", "product"],
 };
 

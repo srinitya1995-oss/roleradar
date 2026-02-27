@@ -112,6 +112,7 @@ function migrateJobsV2Scoring(): void {
   if (!cols.some((c) => c.name === "resume_match")) db.exec("ALTER TABLE jobs ADD COLUMN resume_match INTEGER");
   if (!cols.some((c) => c.name === "bucket")) db.exec("ALTER TABLE jobs ADD COLUMN bucket TEXT");
   if (!cols.some((c) => c.name === "suggestions_json")) db.exec("ALTER TABLE jobs ADD COLUMN suggestions_json TEXT");
+  if (!cols.some((c) => c.name === "needs_hydration")) db.exec("ALTER TABLE jobs ADD COLUMN needs_hydration INTEGER DEFAULT 0");
   // Backfill first_seen_at / last_seen_at from created_at for existing rows
   db.exec(
     "UPDATE jobs SET first_seen_at = COALESCE(first_seen_at, created_at), last_seen_at = COALESCE(last_seen_at, created_at) WHERE first_seen_at IS NULL OR last_seen_at IS NULL"

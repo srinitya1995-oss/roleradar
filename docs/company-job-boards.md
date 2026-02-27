@@ -20,13 +20,17 @@ Below: current parser support snapshot. Checked career pages for: Netflix, Adobe
 
 ## Not supported (custom / proprietary)
 
-| Company   | Careers URL              | Notes |
-|----------|--------------------------|--------|
-| **Netflix**  | jobs.netflix.com → explore.jobs.netflix.net | Custom platform. |
-| **TikTok**   | careers.tiktok.com, joinbytedance.com | ByteDance custom. |
-| **Google**   | careers.google.com       | Own system (post–Google Hire). |
-| **Meta**     | metacareers.com, facebookcareers.com | Custom careers portal. |
-| **Apple**    | jobs.apple.com           | Proprietary job portal. |
+We **don’t have parsers** for these. Their career sites use custom or proprietary systems; adding them would require building a new parser or using headless discovery (see JOB_SOURCE_FETCHING_V2_SPEC.md § TYPE 4).
+
+| Company    | Careers URL              | Notes |
+|------------|--------------------------|--------|
+| **TikTok** | careers.tiktok.com, joinbytedance.com | ByteDance custom. |
+| **Apple**  | jobs.apple.com           | Proprietary job portal. |
+| **Google** | careers.google.com       | Own system (post–Google Hire). |
+| **Microsoft** | careers.microsoft.com | Custom careers portal. |
+| **Intuit** | intuit.com/careers, jobs.intuit.com | Custom platform. |
+| **Netflix** | jobs.netflix.com → explore.jobs.netflix.net | Custom platform. |
+| **Meta**   | metacareers.com, facebookcareers.com | Custom careers portal. |
 
 ---
 

@@ -33,14 +33,13 @@ export const GATE0_HARD_TITLE_EXCLUSION = [
   "program manager",
   "technical program manager",
   "project manager",
-  "assistant",
   "business partner",
   "compliance",
   "legal",
   "hr",
 ];
 
-/** GATE 1 — Title must contain one of these (PM role). GPM added only when allow_gpm true (see passesTitleAndDescriptionGates). */
+/** GATE 1 — Title must contain one of these (PM role). Consumer AI / Big Tech: Siri, Gemini, Copilot, etc. GPM added only when allow_gpm true. */
 export const GATE1_PM_TITLE = [
   "product manager",
   "product management",
@@ -57,6 +56,14 @@ export const GATE1_PM_TITLE = [
   "personalization",
   "discovery",
   "consumer",
+  "multimodal",
+  "siri",
+  "apple intelligence",
+  "gemini",
+  "copilot",
+  "search",
+  "shopping",
+  "assistant",
 ];
 
 /** GATE 2 — Title must contain one of these (seniority): Senior, Sr, Principal, Staff. */
@@ -158,5 +165,21 @@ export function passesTitleAndDescriptionGates(
   if (!passesGate1(title, allowGpm)) return false;
   if (!allowJuniorPm && !passesGate2(title)) return false;
   if (!passesGate4(title, description)) return false;
+  return true;
+}
+
+/**
+ * Same as above but skips GATE 4. Use when description is missing (e.g. Greenhouse/Workday list API).
+ * Caller should insert with needs_hydration=1 and run hydration later to fetch description and re-run Gate 4 + scoring.
+ */
+export function passesTitleAndDescriptionGatesSkipGate4(
+  title: string | null | undefined,
+  _description: string | null | undefined,
+  allowGpm = false,
+  allowJuniorPm = false
+): boolean {
+  if (!passesGate0(title)) return false;
+  if (!passesGate1(title, allowGpm)) return false;
+  if (!allowJuniorPm && !passesGate2(title)) return false;
   return true;
 }

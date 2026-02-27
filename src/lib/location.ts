@@ -37,7 +37,7 @@ export function parseLocation(location: string | null | undefined): LocationPars
 /**
  * Job is location-eligible if: (allowed city/state/country match) OR (remote-only and (allow_remote OR "Remote" in allowed list)).
  * Uses normalize() so job location "San Francisco, CA" passes when allowed has "CA" or "San Francisco".
- * If the normalized job location contains any normalized allowed_locations substring, PASS.
+ * Explicit pass: if API returns "United States" or "Remote", and that value is in allowed_locations, PASS (no city required).
  */
 export function locationEligible(
   location: string | null | undefined,
@@ -48,12 +48,17 @@ export function locationEligible(
   if (!parsed.raw_location) return true;
 
   const normLocation = normalizeForMatch(location);
+  const allowedNormSet = new Set(allowedLocations.map((a) => normalizeForMatch(a)).filter(Boolean));
+
+  if (allowRemote && parsed.is_remote_only) return true;
+  if (["remote", "united states", "usa", "us"].some((t) => normLocation === t && allowedNormSet.has(t))) return true;
+
   const allowedMatch = (): boolean =>
     allowedLocations.some((a) => {
       const normAllowed = normalizeForMatch(a);
       return normAllowed.length > 0 && normLocation.includes(normAllowed);
     });
 
-  if (parsed.is_remote_only) return allowRemote || allowedMatch();
+  if (parsed.is_remote_only) return allowedMatch();
   return allowedMatch();
 }

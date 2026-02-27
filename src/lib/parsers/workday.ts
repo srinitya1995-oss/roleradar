@@ -36,12 +36,28 @@ export async function parseWorkdayBoard(boardUrl: string): Promise<ParsedJob[]> 
     );
     const postings = data?.jobPostings ?? [];
     if (postings.length > 0) {
-      return postings.map((job) => ({
-        title: job.title ?? "",
-        url: job.externalUrl ?? `${baseUrl}/${site}/job/${job.id}`,
-        location: job.locationsText ?? "",
-        external_id: job.id ?? "",
-      }));
+      return postings
+        .map((job) => {
+          const id = job.id ?? "";
+          const externalUrl = job.externalUrl ?? (id ? `${baseUrl}/${site}/job/${id}` : null);
+          if (!externalUrl || externalUrl.includes("undefined")) return null;
+          const external_id = id || (() => {
+            try {
+              const segs = new URL(externalUrl).pathname.replace(/^\/+|\/+$/g, "").split("/");
+              const jobIdx = segs.findIndex((p) => p.toLowerCase() === "job");
+              return jobIdx >= 0 && segs[jobIdx + 1] != null ? segs[jobIdx + 1] : externalUrl;
+            } catch {
+              return externalUrl;
+            }
+          })();
+          return {
+            title: job.title ?? "",
+            url: externalUrl,
+            location: job.locationsText ?? "",
+            external_id,
+          };
+        })
+        .filter((j): j is NonNullable<typeof j> => j != null);
     }
   } catch {
     // Fall through to HTML
