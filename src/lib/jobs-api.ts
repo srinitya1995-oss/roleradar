@@ -48,6 +48,7 @@ export function getJobsPayload(): {
   rejectedRelevantOnly: unknown[];
   reject: unknown[];
   other: unknown[];
+  interested: unknown[];
   jobsByCompany: { company: string; jobs: unknown[] }[];
 } {
   const settings = getSettings();
@@ -76,7 +77,8 @@ export function getJobsPayload(): {
   }
 
   const byLocation = (r: JobRow) => locationEligible(r.location, settings.allowed_locations, settings.allow_remote);
-  const eligible = deduped.filter(byLocation);
+  const isNotIndeed = (r: JobRow) => (r.company ?? "").trim().toLowerCase() !== "indeed";
+  const eligible = deduped.filter(byLocation).filter(isNotIndeed);
 
   const apply_now = eligible.filter((r) => effectiveBucket(r) === "APPLY_NOW");
   const strong_fit = eligible.filter((r) => effectiveBucket(r) === "STRONG_FIT");
@@ -187,6 +189,8 @@ export function getJobsPayload(): {
   const payloadHide = toPayload(hide, "HIDE");
   const allPayloads = [...payloadApplyNow, ...payloadStrongFit, ...payloadNearMatch, ...payloadReview, ...payloadHide];
 
+  const interested = allPayloads.filter((j) => (j.tracking_status ?? "").trim() !== "");
+
   const byCompany: Record<string, typeof allPayloads> = {};
   for (const job of allPayloads) {
     const company = (job.company ?? "Other").trim() || "Other";
@@ -201,6 +205,7 @@ export function getJobsPayload(): {
     rejectedRelevantOnly: payloadNearMatch,
     reject: payloadReview,
     other: payloadHide,
+    interested,
     jobsByCompany: companyNames.map((company) => ({ company, jobs: byCompany[company]! })),
   };
 }

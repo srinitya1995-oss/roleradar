@@ -205,7 +205,7 @@ export default function JobDetailPage() {
             {job.final_fit_score != null && <span className="score">Fit {job.final_fit_score}</span>}
             {job.resume_match != null && <span className="score">Resume {job.resume_match}</span>}
           </div>
-          {job.url && (
+          {job.url && job.url.startsWith("http") && !job.url.includes("undefined") && (
             <a href={job.url} target="_blank" rel="noopener noreferrer" className="job-link">
               View job posting
             </a>
@@ -368,6 +368,8 @@ export default function JobDetailPage() {
                 )}
               </section>
             )}
+          </>
+        )}
       </div>
       <style jsx global>{`
         .inbox-page h1 { font-size: 1.25rem; margin-bottom: 0.5rem; }

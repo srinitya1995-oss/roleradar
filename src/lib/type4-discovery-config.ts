@@ -13,54 +13,54 @@ export type Type4Source = {
   discoveryUrl?: string;
 };
 
-/** Solid "Big Tech" seed data — Custom Enterprise targets that match your profile. Use in seeding script so the agent pulls relevant data. */
+/** Solid "Big Tech" seed data — Broader queries so SerpApi returns jobs from these companies. */
 export const TYPE_4_SOURCES: Type4Source[] = [
   {
     company: "Apple",
     targetOrgProduct: "Apple Intelligence & Siri",
-    seedQuery: "Senior Product Manager Apple Intelligence Siri",
+    seedQuery: "Product Manager Apple",
     whyFits: "Matches your 89% → 99% accuracy work on conversational reasoning and Siri's new agentic capabilities.",
     discoveryUrl: "https://jobs.apple.com/en-us/search",
   },
   {
     company: "Google",
     targetOrgProduct: "Gemini / Shopping",
-    seedQuery: "Senior Product Manager Gemini Retail CX",
+    seedQuery: "Product Manager Google",
     whyFits: "Direct 1:1 match for your Amazon Rufus (conversational shopping) experience.",
     discoveryUrl: "https://careers.google.com/jobs/results/",
   },
   {
     company: "Microsoft",
     targetOrgProduct: "Copilot Consumer (MAI)",
-    seedQuery: "Principal Product Manager Copilot Consumer Search",
+    seedQuery: "Product Manager Microsoft",
     whyFits: "Matches your work on multimodal discovery and 0→1 consumer search experiences.",
     discoveryUrl: "https://careers.microsoft.com/professionals/us/en/search",
   },
   {
     company: "Netflix",
     targetOrgProduct: "Personalization & Discovery",
-    seedQuery: "AI Product Manager Personalization Discovery",
+    seedQuery: "Product Manager Netflix",
     whyFits: "Matches your 92% recommendation relevancy success and content discovery strategy.",
     discoveryUrl: "https://jobs.netflix.com/search",
   },
   {
     company: "TikTok",
     targetOrgProduct: "TikTok Shop AI",
-    seedQuery: "Product Manager TikTok Shop User Product",
+    seedQuery: "Product Manager TikTok",
     whyFits: "Matches your consumer-facing discovery and shopping agent work.",
     discoveryUrl: "https://careers.tiktok.com/",
   },
   {
     company: "Meta",
     targetOrgProduct: "Llama / GenAI Product",
-    seedQuery: "Technical Product Manager Multimodal AI",
+    seedQuery: "Product Manager Meta",
     whyFits: "Matches your work on Alexa multimodal interfaces.",
     discoveryUrl: "https://www.metacareers.com/jobs",
   },
   {
     company: "Intuit",
     targetOrgProduct: "AI Foundations / GenOS",
-    seedQuery: "Staff PM AI Agents Context",
+    seedQuery: "Product Manager Intuit",
     whyFits: "Matches your reasoning infrastructure at Amazon.",
     discoveryUrl: "https://www.intuit.com/careers/",
   },

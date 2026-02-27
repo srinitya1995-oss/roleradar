@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
 
 export type Job = {
   id: number;
@@ -16,6 +15,8 @@ export type Job = {
   connection_status?: string;
   connection_targets?: { type_label: string; why_selected: string; search_url?: string }[];
   tracking_status?: string | null;
+  /** ISO date string: reposted_at ?? posted_at ?? first_seen_at ?? created_at */
+  date_posted?: string | null;
 };
 
 const TRACKING_OPTIONS = [
@@ -37,6 +38,7 @@ function JobRow({
   const fitScore = job.final_fit_score != null ? Math.round(job.final_fit_score) : null;
   const connectionLabel = job.connection_status === "found" ? "Found" : job.connection_status === "not_found" ? "Not found" : job.connection_status === "stale" ? "Stale" : "—";
   const trackingValue = job.tracking_status ?? "";
+  const hasPostingUrl = job.url && job.url.startsWith("http") && !job.url.includes("undefined");
 
   return (
     <tr className="inbox-job-row">
@@ -45,14 +47,26 @@ function JobRow({
           {job.title ?? "Untitled"}
         </a>
       </td>
+      <td className="inbox-col-posting">
+        {hasPostingUrl ? (
+          <a href={job.url!} target="_blank" rel="noopener noreferrer" className="inbox-posting-link">
+            Open posting
+          </a>
+        ) : (
+          <a href={`/job/${job.id}`} className="inbox-posting-link">View job</a>
+        )}
+      </td>
       <td className="inbox-col-company">{job.company ?? "—"}</td>
       <td className="inbox-col-location">{job.location ?? "—"}</td>
+      <td className="inbox-col-posted" title={job.date_posted && !Number.isNaN(new Date(job.date_posted).getTime()) ? new Date(job.date_posted).toLocaleString() : undefined}>
+        {formatPostedAgo(job.date_posted)}
+      </td>
       <td className="inbox-col-resume">{resumePct != null ? `${resumePct}%` : "—"}</td>
       <td className="inbox-col-fit">{fitScore != null ? fitScore : "—"}</td>
       <td className="inbox-col-connection">
-        <Link href={`/job/${job.id}`} className="inbox-connection-link">
+        <a href={`/job/${job.id}`} className="inbox-connection-link">
           {connectionLabel}
-        </Link>
+        </a>
       </td>
       <td className="inbox-col-tracking">
         <select
@@ -79,8 +93,10 @@ function InboxTable({ jobs, onTrackingChange }: { jobs: Job[]; onTrackingChange:
       <thead>
         <tr>
           <th className="inbox-col-title">Job title</th>
+          <th className="inbox-col-posting">Posting</th>
           <th className="inbox-col-company">Company</th>
           <th className="inbox-col-location">Location</th>
+          <th className="inbox-col-posted">Posted</th>
           <th className="inbox-col-resume">Resume match</th>
           <th className="inbox-col-fit">Fit score</th>
           <th className="inbox-col-connection">Connection</th>
@@ -114,6 +130,24 @@ function formatMinutesAgo(iso: string): string {
   return `${min} min ago`;
 }
 
+function formatPostedAgo(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return "—";
+  const now = Date.now();
+  const diffMs = now - then;
+  const diffMin = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+  if (diffMin < 1) return "just now";
+  if (diffMin < 60) return diffMin === 1 ? "1 min ago" : `${diffMin} min ago`;
+  if (diffHours < 24) return diffHours === 1 ? "1 hour ago" : `${diffHours} hours ago`;
+  if (diffDays === 1) return "1 day ago";
+  if (diffDays < 30) return `${diffDays} days ago`;
+  const d = new Date(iso);
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: d.getFullYear() !== new Date().getFullYear() ? "numeric" : undefined });
+}
+
 function nextUpdateInMin(lastPollAt: string | null, pollIntervalMs: number): number | null {
   if (!lastPollAt || !pollIntervalMs) return null;
   const nextAt = new Date(lastPollAt).getTime() + pollIntervalMs;
@@ -127,6 +161,7 @@ type InboxData = {
   rejectedRelevantOnly?: Job[];
   reject?: Job[];
   other?: Job[];
+  interested?: Job[];
 };
 
 function toInboxData(raw: {
@@ -135,6 +170,7 @@ function toInboxData(raw: {
   rejectedRelevantOnly?: unknown[];
   reject?: unknown[];
   other?: unknown[];
+  interested?: unknown[];
 }): InboxData {
   return {
     top5: (raw.top5 ?? []) as Job[],
@@ -142,6 +178,7 @@ function toInboxData(raw: {
     rejectedRelevantOnly: (raw.rejectedRelevantOnly ?? []) as Job[],
     reject: (raw.reject ?? []) as Job[],
     other: (raw.other ?? []) as Job[],
+    interested: (raw.interested ?? []) as Job[],
   };
 }
 
@@ -179,6 +216,7 @@ export default function InboxClient({
           rejectedRelevantOnly: payload.rejectedRelevantOnly ?? [],
           reject: payload.reject ?? [],
           other: payload.other ?? [],
+          interested: payload.interested ?? [],
         });
       })
       .catch((e) => {
@@ -204,13 +242,26 @@ export default function InboxClient({
         setData((prev) => {
           const update = (jobs: Job[]) =>
             jobs.map((j) => (j.id === jobId ? { ...j, tracking_status: value } : j));
-          return {
+          const next = {
             top5: update(prev.top5 ?? []),
             top20: update(prev.top20 ?? []),
             rejectedRelevantOnly: update(prev.rejectedRelevantOnly ?? []),
             reject: update(prev.reject ?? []),
             other: update(prev.other ?? []),
+            interested: prev.interested ?? [],
           };
+          if (value && (value as string).trim() !== "") {
+            const job =
+              next.top5.find((j) => j.id === jobId) ??
+              next.top20.find((j) => j.id === jobId) ??
+              next.rejectedRelevantOnly?.find((j) => j.id === jobId) ??
+              next.reject?.find((j) => j.id === jobId) ??
+              next.other?.find((j) => j.id === jobId);
+            if (job) next.interested = [job, ...(next.interested ?? []).filter((j) => j.id !== jobId)];
+          } else {
+            next.interested = (next.interested ?? []).filter((j) => j.id !== jobId);
+          }
+          return next;
         });
       })
       .catch(() => setError("Failed to update tracking status"));
@@ -288,6 +339,7 @@ export default function InboxClient({
       <TierSection title="Near match" jobs={data.rejectedRelevantOnly ?? []} onTrackingChange={updateTracking} />
       <TierSection title="Review" jobs={data.reject ?? []} onTrackingChange={updateTracking} />
       <TierSection title="Hidden" jobs={data.other ?? []} onTrackingChange={updateTracking} />
+      <TierSection title="Interested" jobs={data.interested ?? []} onTrackingChange={updateTracking} />
       {!hasAnyJobs && !loading && (
         <section className="inbox-empty" style={{ marginTop: "1.5rem", padding: "1.25rem", background: "#f5f5f5", borderRadius: "8px", maxWidth: "32rem" }}>
           <h2 style={{ marginTop: 0, fontSize: "1.1rem" }}>No jobs yet</h2>

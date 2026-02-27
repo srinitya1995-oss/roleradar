@@ -44,8 +44,8 @@ No job is stored if it fails step 2 or 3. Steps 4–6 run only for jobs that pas
 **Default settings (from code):**
 
 - `allow_remote`: **false** (env `ALLOW_REMOTE` or settings.json).
-- `allowed_locations`:  
-  `["CA", "California", "Seattle", "San Francisco", "SF", "Los Angeles", "LA", "Bellevue", "Redmond", "Seattle, WA", "San Francisco, CA", "Los Angeles, CA", "Bellevue, WA", "Redmond, WA", "Remote", "New York", "NYC", "Boston", "Austin", "Denver"]`.
+- `allowed_locations`: **CA (SF/Bay Area) and Seattle only** —  
+  `["CA", "California", "San Francisco", "SF", "Bay Area", "Los Angeles", "LA", "Seattle", "Bellevue", "Redmond", "Seattle, WA", "San Francisco, CA", "Los Angeles, CA", "Bellevue, WA", "Redmond, WA", "Remote", "United States", "USA", "US"]`.
 
 So with defaults, a job whose location is **only** "Remote" or "Anywhere" (and no city) is allowed only if "Remote" is in the list (it is) and the check is `parsed.raw_location.toLowerCase().includes(a)`: e.g. "remote" includes "remote" → allowed. If the API returns something like "United States" or "India" with no city in our list, the job fails location.
 

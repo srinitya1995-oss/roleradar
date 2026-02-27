@@ -1,6 +1,6 @@
 # Role Radar — Full walkthrough
 
-**Quick start (see jobs + connections):** From project root run **`npm run setup`** (seeds sources + fetches jobs in one go). If you get **0 new jobs**, set **`ALLOW_REMOTE=true`** in `.env` and run **`npm run poll`** again (many boards list "Remote" only). Then either: (A) **`npm run dev:full`** — app + agent in one terminal (agent polls every 30 min), or (B) two terminals: **`npm run dev`** and **`npm run agent`**. Open http://localhost:3000/inbox. Optionally: **`npm run seed-people`** for recommendations.
+**Quick start:** From project root run **`npm run setup`** (seeds sources + fetches jobs in one go). Optionally **`npm run seed-type4`** then **`npm run poll -- --force`** for Big Tech jobs (requires `SERPAPI_API_KEY`). Then **`npm run dev`** (or **`npm run dev:full`** for app + agent). Open **http://127.0.0.1:3000/inbox**. If you get 0 new jobs, set **`ALLOW_REMOTE=true`** in `.env` and run **`npm run poll`** again.
 
 Step-by-step from clone to running app + agent + GitHub.
 
@@ -89,14 +89,13 @@ New jobs are stored in `roleradar.db` with CPI and tier. If you skip this, the a
 
 ## Step 5: Run the app (Inbox UI)
 
-Start the Next.js dev server:
+Start the Next.js dev server (`npm run dev` uses `scripts/dev.sh` to avoid "too many open files" on macOS):
 
 ```bash
 npm run dev
 ```
 
-- Open **http://localhost:3000** for the dashboard (jobs by company, last 7 days).
-- Open **http://localhost:3000/inbox** for the bucketed Inbox (Apply now, Strong fit, Near match, Review, Hidden) and agent status.
+- Open **http://127.0.0.1:3000** for the dashboard (jobs by company). Click **→ Open Inbox** or go to **http://127.0.0.1:3000/inbox** for the bucketed Inbox (Apply now, Strong fit, Near match, Review, Hidden, Interested) and agent status.
 
 Leave this terminal open while you use the app.
 
@@ -182,10 +181,10 @@ Then run `git push -u origin main` in your terminal and enter credentials when a
 |------|------|-------------------|
 | 1 | Clone + install | `git clone ... && cd roleradar && npm install` |
 | 2 | Env (optional) | Create `.env` with `OPENAI_API_KEY` etc. if needed |
-| 3 | Seed sources | `npm run seed-top-companies` |
+| 3 | Seed sources | `npm run seed-top-companies`; optional: `npm run seed-type4` for Big Tech (needs SERPAPI_API_KEY) |
 | 3b | Backfill jobs (if existing rows) | `npm run backfill:jobs` (or `BACKFILL_DAYS=60 npm run backfill:jobs`) |
-| 4 | One-time poll (optional) | `npm run poll` |
-| 5 | Run app | `npm run dev` → open http://localhost:3000/inbox |
+| 4 | One-time poll (optional) | `npm run poll` (or `npm run poll -- --force` to poll all sources) |
+| 5 | Run app | `npm run dev` → open http://127.0.0.1:3000/inbox |
 | 6 | Run agent | `npm run agent` (or PM2 / nohup / launchd; see [AGENT.md](AGENT.md)) |
 | 7 | Push to GitHub | Add remote, then `git push -u origin main` (use token as password) |
 
@@ -193,8 +192,8 @@ Then run `git push -u origin main` in your terminal and enter credentials when a
 
 ## Where things live
 
-- **Inbox:** http://localhost:3000/inbox — jobs by bucket (Apply now, Strong fit, Near match, Review, Hidden), agent status, “Refresh targets” when stale/not_found.
-- **Dashboard:** http://localhost:3000 — jobs by company.
+- **Inbox:** http://127.0.0.1:3000/inbox — jobs by bucket (Apply now, Strong fit, Near match, Review, Hidden, Interested), tracking status, agent status.
+- **Dashboard:** http://127.0.0.1:3000 — jobs by company; link to Inbox.
 - **Job detail:** http://localhost:3000/job/[id] — bucket + scores, 4 referral target slots, copy buttons, “Refresh targets”, suggestions (Near match).
 - **Scoring fixture (dev):** `npm run test:scoring` — runs sample job descriptions and prints expected bucket + scores (local dev sanity check; not required for CI).
 - **Agent status:** Shown on Inbox; or check `.agent-last-poll` file mtime (updated after each poll).

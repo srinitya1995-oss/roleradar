@@ -52,7 +52,7 @@ flowchart TB
 1. **Job sources** (`job_sources` table) — company, URL, parser. **Target strategy:** [JOB_SOURCE_FETCHING_V2_SPEC.md](JOB_SOURCE_FETCHING_V2_SPEC.md) (company tiers, polling frequency, Greenhouse/Ashby/Workday/Custom Enterprise, fetch-time pre-filtering, posted_date ≤ 21 days). Current poll is legacy.
 2. **Poll** (`npm run poll`) — fetches listings from each enabled source; for each job runs **GATE 0→4** (title exclusion, PM title, seniority, location, description sanity). Only if all pass → **final_fit_score** (0–100) and **resume_match** (0–100) computed; **bucket** (APPLY_NOW / STRONG_FIT / NEAR_MATCH / REVIEW / HIDE) stored on job. NEAR_MATCH jobs get **suggestions_json** (tailored resume emphasis).
 3. **Scoring** — Role Relevance (0–40) + AI Depth (0–30) + Domain Fit (0–20) − Penalties (0–30) → final_fit_score 0–100. Bucket from resume_match + final_fit_score. See [INBOX_AND_AGENT_SPEC.md](INBOX_AND_AGENT_SPEC.md).
-4. **Inbox** — reads `jobs` via GET /api/jobs/list; jobs where (posted_at OR first_seen_at) in last **recency_days** (default 21), deduped by (company, normalized title). Sections: Apply now, Strong fit, Near match, Review, Hidden. Location: CA + Seattle; remote-only excluded unless allow_remote.
+4. **Inbox** — reads `jobs` via GET /api/jobs/list; jobs in last **7 days**, deduped by (company, normalized title). Sections: Apply now, Strong fit, Near match, Review, Hidden, **Interested** (non-empty tracking_status). Location: CA (Bay Area + LA) + Seattle; Indeed excluded; out-of-area states blocked. See [INBOX_AND_AGENT_SPEC.md](INBOX_AND_AGENT_SPEC.md), [FINAL_FLOW.md](FINAL_FLOW.md).
 5. **Job detail** — **referral targets** (4 slots: Recruiter, Hiring Manager, Team PM/Peer, High-Signal Connector) from `job_referral_targets`. **connection_status** (n/a, not_found, found, stale); **Refresh targets** when stale/not_found. **Suggestions** for NEAR_MATCH. See [CONNECTIONS_LOGIC_V2_SPEC.md](CONNECTIONS_LOGIC_V2_SPEC.md).
 6. **Agent** (`npm run agent`) — wake interval (default 30 min); per-source poll is tier-based (30 min / 2 hr / daily). Prewarm for APPLY_NOW, STRONG_FIT, top NEAR_MATCH (resume_match ≥ 88). Config: [INBOX_AND_AGENT_SPEC.md](INBOX_AND_AGENT_SPEC.md).
 
@@ -72,7 +72,7 @@ flowchart TB
 | Selective targeting | Only roles that pass explicit gates (PM title, seniority, location, description sanity, CPI). |
 | Principal GenAI focus | Optimize for Principal-level, GenAI-relevant product roles. |
 | Referral-first | Connect note → referral ask; manual approval at every step. |
-| Single source of truth | One inbox with jobs bucketed: Apply now, Strong fit, Near match, Review, Hidden. |
+| Single source of truth | One inbox with jobs bucketed: Apply now, Strong fit, Near match, Review, Hidden, Interested (tracking status). |
 
 ### Non-Goals (Out of Scope)
 

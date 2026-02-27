@@ -38,7 +38,7 @@ pnpm dev
 bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) (or the port shown) for the dashboard. Jobs are grouped by company; click a role to see connections and referral copy.
+Open **http://127.0.0.1:3000/inbox** for the Inbox (Apply now, Strong fit, Near match, Review, Hidden, Interested), or http://127.0.0.1:3000 for the dashboard (jobs by company). Click a role to see connections and referral copy.
 
 ### Agent (search jobs + warm connections)
 
@@ -63,9 +63,10 @@ Env (optional):
 
 ### Other commands
 
-- `npm run poll` — one-time poll of all enabled job sources
+- `npm run poll` — one-time poll of enabled sources; `npm run poll -- --force` polls all
+- `npm run seed-top-companies` — seed job sources (Anthropic, Adobe, OpenAI, Uber, etc.)
+- `npm run seed-type4` — add Big Tech sources via SerpApi (Apple, Google, Microsoft, Meta, etc.); needs `SERPAPI_API_KEY`
 - `npm run rebuild-inbox` — clear jobs and referral targets, then poll
-- `npm run seed-top-companies` — seed job sources (e.g. Anthropic, Adobe, OpenAI)
 
 ## Learn More
 

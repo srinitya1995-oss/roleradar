@@ -10,8 +10,9 @@ End-to-end flow with every step so you can verify behavior.
 |------|------------------|---------------|
 | 1.1 | **`npm run setup`** (recommended) | Seeds job_sources (Anthropic, Adobe, Airbnb, Uber, OpenAI) **and** runs poll once. Prints: new jobs this run, total in DB. If 0 new: suggests setting `ALLOW_REMOTE=true` in .env (many boards list "Remote" only). |
 | 1.1b | Or: `npm run seed-top-companies` then `npm run poll` | Same effect as setup; poll fetches jobs. If you get 0 new jobs, set `ALLOW_REMOTE=true` in .env and run `npm run poll` again. |
+| 1.1c | (optional) `npm run seed-type4` then `npm run poll -- --force` | Adds Big Tech sources (Apple, Google, Microsoft, Meta, Netflix, TikTok, Intuit) via SerpApi; requires `SERPAPI_API_KEY` in .env. |
 | 1.2 | Agent: `npm run agent` (or `npm run dev:full`) | Agent runs poll on a schedule (default every 30 min). **Leave it running** in a terminal so new jobs keep coming. Home page shows a banner when agent is not running. |
-| 1.3 | `npm run dev` or `npm run dev:full` | Next.js app on http://127.0.0.1:3000. `dev:full` also starts the agent in the same terminal (concurrently). |
+| 1.3 | `npm run dev` or `npm run dev:full` | Next.js app on http://127.0.0.1:3000 (dev uses `scripts/dev.sh` for higher file limit). `dev:full` also starts the agent in the same terminal (concurrently). Open **http://127.0.0.1:3000/inbox** for the Inbox. |
 | 1.4 | (optional) `npm run seed-people` | Inserts people into `people`; job detail page uses these for "People to connect & ask for referral" (recommendations). |
 | 1.5 | (optional) `OPENAI_API_KEY` in `.env` | Job detail and agent use LLM for referral targets when eligible; otherwise heuristic only. |
 
@@ -26,8 +27,8 @@ End-to-end flow with every step so you can verify behavior.
 | 2.1 | Load all enabled sources: `SELECT id, company, url, parser, company_tier, last_polled_at FROM job_sources WHERE enabled = 1`. |
 | 2.2 | Filter to **due** sources: `sourceDue(source)` = (never polled) OR (last_polled_at + tier_interval has passed). Tier 1 → 30 min, Tier 2 → 2 hr, Tier 3 → 1 day. |
 | 2.3 | For each due source: call parser (e.g. parseGreenhouseBoard(url)) → list of { title, url, location, external_id, description?, posted_at? }. |
-| 2.4 | For each parsed job: if external_id already in DB for this source_id → skip. Else: |
-| 2.5 | **Location:** `locationEligible(location, settings.allowed_locations, settings.allow_remote)`. Default: CA/Seattle allowed; remote-only excluded unless allow_remote. Skip if not eligible. |
+| 2.4 | For each parsed job: if external_id already in DB for this source_id → skip. If company (from parser or source) is **Indeed** → skip. Else: |
+| 2.5 | **Location:** `locationEligible(location, settings.allowed_locations, settings.allow_remote)`. Default: **CA (SF/Bay Area + LA) and Seattle**; out-of-area states (e.g. SC, NY, TX) blocked; remote-only excluded unless allow_remote. Skip if not eligible. |
 | 2.6 | **Gates:** `passesTitleAndDescriptionGates(title, description, settings.allow_gpm)`. PM/PM-T/seniority; GPM only if allow_gpm. Skip if not pass. |
 | 2.7 | **Scores:** `final_fit_score = computeFinalFitScore(title, description)` (0–100). `resume_match = profileMatchScore(title, description)` (0–100). `bucket = computeBucket(resume_match, final_fit_score)` → APPLY_NOW | STRONG_FIT | NEAR_MATCH | REVIEW | HIDE. |
 | 2.8 | **Legacy:** `cpi = round(final_fit_score/10)`, `tier = Top 5% | Top 20% | Reject` (still written for back-compat). |
@@ -44,15 +45,15 @@ End-to-end flow with every step so you can verify behavior.
 
 | Step | Detail |
 |------|--------|
-| 3.1 | **Recency:** `recency_days = getSettings().recency_days` (default 21). SQL: `(posted_at IS NOT NULL AND posted_at >= now - recency_days) OR (posted_at IS NULL AND first_seen_at >= now - recency_days)`. |
+| 3.1 | **Recency:** List API uses **recency_days = 7** (hardcoded in jobs-api). SQL: `(posted_at OR first_seen_at OR created_at) >= now - 7 days`. |
 | 3.2 | **Query:** SELECT jobs + company from job_sources; ORDER BY posted_at/first_seen_at DESC, final_fit_score DESC, cpi DESC, id DESC. |
 | 3.3 | **Dedupe:** By `(company.toLowerCase(), normalizeTitle(title))`; keep first occurrence. |
-| 3.4 | **Location:** Filter with `locationEligible(location, allowed_locations, allow_remote)`. |
+| 3.4 | **Location:** Filter with `locationEligible(location, allowed_locations, allow_remote)`. **Indeed** company excluded (isNotIndeed). |
 | 3.5 | **Bucket split:** effectiveBucket(row) from stored bucket or derived from resume_match/final_fit_score (legacy). Split into: apply_now (APPLY_NOW), strong_fit (STRONG_FIT), near_match (NEAR_MATCH), review (REVIEW), hide (HIDE). |
 | 3.6 | **Connection status per job:** needConnectionsV2(bucket, final_fit_score). If false → connection_status = "n/a". Else: if no targets → "not_found"; if oldest target created_at < now - target_stale_days → "stale"; else "found". Load targets from job_referral_targets for all job ids. |
-| 3.7 | **Payload:** top5 (= apply_now), top20 (= strong_fit), rejectedRelevantOnly (= near_match), reject (= review), other (= hide). Plus jobsByCompany for home page. Each job includes id, title, location, url, bucket, connection_status, match_pct, connection_targets (type_label, why_selected, confidence). |
+| 3.7 | **Payload:** top5, top20, rejectedRelevantOnly, reject, other, **interested** (jobs with non-empty tracking_status). Plus jobsByCompany for home page. Each job includes id, title, location, url, date_posted, bucket, connection_status, profile_match_pct, final_fit_score, connection_targets, tracking_status. |
 
-**Inbox UI:** Renders sections in order: Apply now, Strong fit, Near match, Review, Hidden. Each section shows job cards (title, location, bucket badge, Copy connect note, Copy referral ask, Refresh targets if connection_status stale/not_found).
+**Inbox UI:** Sections in order: Apply now, Strong fit, Near match, Review, Hidden, **Interested**. Table columns: Job title, Posting, Company, Location, Posted (e.g. "1 day ago"), Resume match, Fit score, Connection, Tracking status (dropdown: —, Asked for referral, Applied, Interviewing, Declined). Jobs with a set tracking status also appear in Interested.
 
 ---
 
@@ -110,8 +111,8 @@ End-to-end flow with every step so you can verify behavior.
 
 | Setting | Default | Effect |
 |--------|--------|--------|
-| recency_days | 21 | Inbox: only jobs with posted_at or first_seen_at in last N days. |
-| allowed_locations | CA, Seattle, SF, LA, Bellevue, Redmond, … | locationEligible: job location must match or be remote (if allow_remote). |
+| recency_days | 21 | (Used elsewhere; list API uses **7 days** hardcoded.) |
+| allowed_locations | CA, SF, Bay Area, LA, Seattle, Bellevue, Redmond, Los Gatos, Cupertino, Mountain View, San Jose, Palo Alto, Menlo Park, Fremont, … | locationEligible: job location must match or be remote (if allow_remote). Out-of-area states (SC, NY, TX, etc.) blocked in location.ts. |
 | allow_remote | false | If false, remote-only postings excluded. |
 | allow_gpm | false | If true, "Group Product Manager" passes title gate. |
 | target_stale_days | 14 | connection_status "stale" if oldest target older than N days. |

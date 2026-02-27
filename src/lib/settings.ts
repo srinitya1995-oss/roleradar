@@ -1,36 +1,47 @@
 /**
  * Settings: precedence env > settings.json > defaults.
- * Canonical: recency_days (21), CA + Seattle only, no remote-only unless allow_remote.
+ * Canonical: recency_days (21), CA (SF/Bay Area) + Seattle only, no remote-only unless allow_remote.
  */
 
 import * as fs from "fs";
 import * as path from "path";
 
 export const defaultRecencyDays = 21;
+/** CA (SF/Bay Area: Los Gatos, Cupertino, Mountain View, San Jose, Palo Alto, Menlo Park, Fremont, SF, etc.) and Seattle. */
 export const defaultAllowedLocations: string[] = [
   "CA",
   "California",
-  "Seattle",
   "San Francisco",
   "SF",
+  "Bay Area",
+  "Los Gatos",
+  "Cupertino",
+  "Mountain View",
+  "San Jose",
+  "Palo Alto",
+  "Menlo Park",
+  "Fremont",
   "Los Angeles",
   "LA",
+  "Seattle",
   "Bellevue",
   "Redmond",
   "Seattle, WA",
   "San Francisco, CA",
   "Los Angeles, CA",
+  "Los Gatos, CA",
+  "Cupertino, CA",
+  "Mountain View, CA",
+  "San Jose, CA",
+  "Palo Alto, CA",
+  "Menlo Park, CA",
+  "Fremont, CA",
   "Bellevue, WA",
   "Redmond, WA",
   "Remote",
   "United States",
   "USA",
   "US",
-  "New York",
-  "NYC",
-  "Boston",
-  "Austin",
-  "Denver",
 ];
 
 export const defaultAllowRemote = false;

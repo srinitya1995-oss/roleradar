@@ -190,7 +190,10 @@ export default function Home() {
         <header className="dashboard-header">
           <h1>Role Radar</h1>
           <p className="dashboard-subtitle">
-            Jobs by company · bucketed by fit (Apply now / Strong fit / Near match / Review / Hidden) · <Link href="/inbox">Inbox view</Link>
+            Jobs by company · bucketed by fit (Apply now / Strong fit / Near match / Review / Hidden)
+          </p>
+          <p style={{ marginTop: "0.5rem" }}>
+            <Link href="/inbox" className="inbox-nav-link" style={{ fontWeight: 600, fontSize: "1.1rem" }}>→ Open Inbox</Link>
           </p>
         </header>
         {agentLive === false && (

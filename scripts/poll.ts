@@ -117,6 +117,9 @@ export async function runPoll(forceAll = false, forceRescore = false): Promise<{
       let skippedLocation = 0;
       let skippedGates = 0;
       for (const job of jobs) {
+        const company = (job.company ?? source.company ?? "").trim().toLowerCase();
+        if (company === "indeed") continue;
+
         const title = job.title ?? null;
         const location = job.location ?? "";
         const description = job.description ?? null;

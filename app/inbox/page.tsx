@@ -5,14 +5,14 @@ import InboxClient from "./InboxClient";
 export const dynamic = "force-dynamic";
 
 export default async function InboxPage() {
-  let payload: { top5: unknown[]; top20: unknown[]; rejectedRelevantOnly: unknown[]; reject: unknown[]; other: unknown[] };
+  let payload: { top5: unknown[]; top20: unknown[]; rejectedRelevantOnly: unknown[]; reject: unknown[]; other: unknown[]; interested: unknown[] };
   let agentStatus = { live: false, lastPollAt: null as string | null, pollIntervalMs: 30 * 60 * 1000 };
 
   try {
     payload = getJobsPayload();
   } catch (e) {
     console.error("Inbox getJobsPayload:", e);
-    payload = { top5: [], top20: [], rejectedRelevantOnly: [], reject: [], other: [] };
+    payload = { top5: [], top20: [], rejectedRelevantOnly: [], reject: [], other: [], interested: [] };
   }
 
   try {
@@ -27,6 +27,7 @@ export default async function InboxPage() {
     rejectedRelevantOnly: payload.rejectedRelevantOnly ?? [],
     reject: payload.reject ?? [],
     other: payload.other ?? [],
+    interested: payload.interested ?? [],
   };
 
   return (

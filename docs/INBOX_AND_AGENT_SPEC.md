@@ -27,8 +27,9 @@
 3. **Near match** (bucket NEAR_MATCH)
 4. **Review** (bucket REVIEW)
 5. **Hidden** (bucket HIDE)
+6. **Interested** (jobs with non-empty tracking_status: Asked for referral, Applied, Interviewing, Declined)
 
-**Data scope:** Jobs from DB where **(posted_at OR first_seen_at) ≥ now − recency_days** (default **21**), deduped by (company, normalized title). Only jobs that pass the **location policy** are included.
+**Data scope:** List API uses **7 days** recency (hardcoded in jobs-api). Jobs deduped by (company, normalized title). Only jobs that pass the **location policy** and are not company **Indeed** are included.
 
 **Recency:** Single rule: `(posted_at IS NOT NULL AND posted_at >= now - recency_days) OR (posted_at IS NULL AND first_seen_at >= now - recency_days)`. Configurable via `recency_days` (default 21).
 

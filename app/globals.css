@@ -61,7 +61,11 @@ a {
 .inbox-title-link:hover { color: #2563eb; }
 .inbox-col-company { min-width: 6rem; }
 .inbox-col-location { min-width: 5rem; white-space: nowrap; }
+.inbox-col-posted { min-width: 6rem; white-space: nowrap; }
 .inbox-col-resume, .inbox-col-fit { width: 5rem; text-align: right; }
+.inbox-col-posting { min-width: 6rem; }
+.inbox-posting-link { color: #2563eb; text-decoration: underline; font-size: 0.875rem; }
+.inbox-posting-link:hover { color: #1d4ed8; }
 .inbox-col-connection { min-width: 5rem; }
 .inbox-connection-link { color: #2563eb; text-decoration: underline; }
 .inbox-connection-link:hover { color: #1d4ed8; }
