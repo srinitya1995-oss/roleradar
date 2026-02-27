@@ -113,10 +113,10 @@ export function getJobsPayload(): {
   };
 
   function matchLabel(r: JobRow, resumeMatch: number, finalFitScore: number): string {
-    if (resumeMatch >= 95 && finalFitScore >= 85) return "Resume match";
-    if (resumeMatch >= 90 && finalFitScore >= 80) return "Good match";
-    if (resumeMatch >= 80 && finalFitScore >= 70) return "Good match (minor edits)";
-    if (resumeMatch >= 70) return "Review";
+    if (resumeMatch >= 80 && finalFitScore >= 80) return "Resume match";
+    if (resumeMatch >= 70 && finalFitScore >= 75) return "Good match";
+    if (resumeMatch >= 60 && finalFitScore >= 65) return "Good match (minor edits)";
+    if (resumeMatch >= 50) return "Review";
     return "Review";
   }
 

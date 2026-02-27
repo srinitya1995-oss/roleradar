@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { connectNote, referralMessage } from "@/src/lib/messages";
 
-export type Job = { id: number; title: string | null; location: string | null; url: string | null; external_id: string | null; cpi?: number | null; tier?: string | null; bucket?: string | null; connection_status?: string };
+export type Job = { id: number; title: string | null; location: string | null; url: string | null; external_id: string | null; cpi?: number | null; tier?: string | null; bucket?: string | null; connection_status?: string; company?: string | null };
 
 function CopyButton({ text, label }: { text: string; label: string }) {
   const [copied, setCopied] = useState(false);
@@ -19,11 +19,21 @@ function CopyButton({ text, label }: { text: string; label: string }) {
   );
 }
 
+/** LinkedIn People search: Product Managers who used to work at Amazon (company ID 1586). Optionally narrow by current company name in keywords. */
+function linkedInFormerAmazoniansUrl(companyName: string | null | undefined): string {
+  const base = "https://www.linkedin.com/search/results/people/?keywords=Product%20Manager&pastCompany=%221586%22";
+  const company = (companyName ?? "").trim();
+  if (!company) return base;
+  return `${base}&keywords=Product%20Manager%20${encodeURIComponent(company)}`;
+}
+
 function JobCard({ job, recruiterName = "there" }: { job: Job; recruiterName?: string }) {
   const jobId = job.external_id ?? String(job.id);
   const connect = connectNote(recruiterName, jobId);
   const referral = referralMessage(recruiterName, jobId);
   const showRefresh = job.connection_status === "stale" || job.connection_status === "not_found";
+  const showConnectionsLink = job.bucket === "APPLY_NOW" || job.bucket === "STRONG_FIT";
+  const connectionsUrl = linkedInFormerAmazoniansUrl(job.company);
   return (
     <article className="job-card">
       <div className="job-header">
@@ -34,6 +44,11 @@ function JobCard({ job, recruiterName = "there" }: { job: Job; recruiterName?: s
       <div className="job-actions">
         <CopyButton text={connect} label="Copy connect note" />
         <CopyButton text={referral} label="Copy referral ask" />
+        {showConnectionsLink && (
+          <a href={connectionsUrl} target="_blank" rel="noopener noreferrer" className="connections-link">
+            Find former Amazonians at this company
+          </a>
+        )}
         {showRefresh && (
           <a href={`/job/${job.id}?refresh_targets=1`} className="refresh-targets-link">Refresh targets</a>
         )}

@@ -1,7 +1,13 @@
 /**
  * Candidate profile for RoleRadar personalization (prompts, recommendation ranking).
- * Derived from resume; edit as needed. Used to inject "shared background" into Referral Target Finder and ranking.
+ * Semantic matching: normalization, synonyms, and category-based surface scoring.
  */
+
+import {
+  normalizeForMatch,
+  normalizedContainsOrTokensWithin,
+  getEquivalents,
+} from "./normalize";
 
 export type CandidateProfile = {
   name: string;
@@ -52,6 +58,98 @@ export const candidateProfile: CandidateProfile = {
   ],
 };
 
+/**
+ * Category-based surface matching: JD doesn't say "Amazon Rufus", but if it has
+ * Shopping + AI or E-commerce + Conversational, we count it as that surface.
+ * Each category lists alternative token-pairs; if any pair is present (both tokens
+ * in normalized text), the surface gets credit.
+ */
+const SURFACE_CATEGORIES: { surface: string; tokenPairs: string[][] }[] = [
+  {
+    surface: "Alexa Generative AI",
+    tokenPairs: [
+      ["conversational", "ai"],
+      ["conversational", "generative"],
+      ["assistant", "llm"],
+      ["voice", "ai"],
+      ["alexa", "ai"],
+    ],
+  },
+  {
+    surface: "conversational shopping",
+    tokenPairs: [
+      ["conversational", "shopping"],
+      ["shopping", "ai"],
+      ["e-commerce", "conversational"],
+      ["ecommerce", "conversational"],
+      ["conversational", "commerce"],
+    ],
+  },
+  {
+    surface: "reasoning infrastructure",
+    tokenPairs: [
+      ["reasoning", "infrastructure"],
+      ["reasoning", "scale"],
+      ["reasoning", "systems"],
+      ["inference", "reasoning"],
+    ],
+  },
+  {
+    surface: "multimodal experiences",
+    tokenPairs: [
+      ["multimodal", "experience"],
+      ["multimodal", "experiences"],
+      ["multimodal", "product"],
+      ["vision", "language"],
+    ],
+  },
+  {
+    surface: "evaluation frameworks",
+    tokenPairs: [
+      ["reasoning", "accuracy"],
+      ["evaluation", "benchmarks"],
+      ["evaluation", "metrics"],
+      ["eval", "benchmark"],
+      ["red team", "model"],
+      ["model", "evaluation"],
+    ],
+  },
+  {
+    surface: "LLM-powered surfaces",
+    tokenPairs: [
+      ["llm", "surface"],
+      ["llm", "surfaces"],
+      ["generative", "product"],
+      ["language model", "product"],
+      ["llm", "product"],
+    ],
+  },
+  {
+    surface: "Amazon Rufus",
+    tokenPairs: [
+      ["shopping", "ai"],
+      ["e-commerce", "conversational"],
+      ["ecommerce", "conversational"],
+      ["search", "generative"],
+      ["commerce", "llm"],
+    ],
+  },
+];
+
+function normalizedTextContainsTokenPair(norm: string, pair: string[]): boolean {
+  const [a, b] = pair.map((p) => normalizeForMatch(p));
+  return norm.includes(a) && norm.includes(b);
+}
+
+function countCategorySurfaceHits(normalizedText: string): number {
+  let hits = 0;
+  for (const { tokenPairs } of SURFACE_CATEGORIES) {
+    const matched = tokenPairs.some((pair) => normalizedTextContainsTokenPair(normalizedText, pair));
+    if (matched) hits += 1;
+  }
+  return hits;
+}
+
 /** Short context string to inject into Referral Target Finder prompt (shared background). */
 export function getCandidateContextForPrompt(profile: CandidateProfile = candidateProfile): string {
   const parts = [
@@ -65,25 +163,41 @@ export function getCandidateContextForPrompt(profile: CandidateProfile = candida
 }
 
 /**
- * Resume-based match: 0–100 score from how well job title + description align with candidate profile
- * (surfaces + background keywords). Used to blend with CPI for Match column.
+ * Resume-based match: 0–100. Uses normalization, synonyms, fuzzy tokens, and category-based
+ * surface matching so that 0→1, 0-to-1, GenAI/LLM, and "Shopping + AI" (for Rufus) all count.
  */
 export function profileMatchScore(
   jobTitle: string | null | undefined,
   jobDescription: string | null | undefined,
   profile: CandidateProfile = candidateProfile
 ): number {
-  const text = [jobTitle ?? "", jobDescription ?? ""].join(" ").toLowerCase();
-  if (!text.trim()) return 0;
+  const raw = [jobTitle ?? "", jobDescription ?? ""].join(" ");
+  if (!raw.trim()) return 0;
 
-  let score = 0;
+  const norm = normalizeForMatch(raw);
+
+  // Keyword score (60 max): each background keyword matches if normalized text contains
+  // the keyword or any of its synonyms (e.g. 0-to-1 and 0→1).
   const maxKeywordScore = 60;
+  let keywordHits = 0;
+  for (const kw of profile.backgroundKeywords) {
+    const equivalents = getEquivalents(kw);
+    if (equivalents.some((e) => norm.includes(e))) keywordHits += 1;
+    else if (normalizedContainsOrTokensWithin(raw, kw)) keywordHits += 1;
+  }
+  const keywordScore = Math.min(
+    maxKeywordScore,
+    (keywordHits / Math.max(profile.backgroundKeywords.length, 1)) * maxKeywordScore
+  );
+
+  // Surface score (40 max): category-based. Count how many surface categories the JD matches.
   const maxSurfaceScore = 40;
-  const keywordHits = profile.backgroundKeywords.filter((kw) => text.includes(kw.toLowerCase())).length;
-  const surfaceHits = profile.surfaces.filter((s) => text.includes(s.toLowerCase())).length;
+  const surfaceCategoryHits = countCategorySurfaceHits(norm);
+  const surfaceScore = Math.min(
+    maxSurfaceScore,
+    (surfaceCategoryHits / Math.max(SURFACE_CATEGORIES.length, 1)) * maxSurfaceScore
+  );
 
-  score += Math.min(maxKeywordScore, (keywordHits / Math.max(profile.backgroundKeywords.length, 1)) * maxKeywordScore);
-  score += Math.min(maxSurfaceScore, (surfaceHits / Math.max(profile.surfaces.length, 1)) * maxSurfaceScore);
-
+  const score = keywordScore + surfaceScore;
   return Math.round(Math.min(100, Math.max(0, score)));
 }

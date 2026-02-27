@@ -7,17 +7,18 @@ export type Bucket = "APPLY_NOW" | "STRONG_FIT" | "NEAR_MATCH" | "REVIEW" | "HID
 
 /**
  * Compute bucket from resume match and fit score.
- * APPLY_NOW: resume >= 95 AND fit >= 85
- * STRONG_FIT: resume 90-94 AND fit >= 80
- * NEAR_MATCH: resume 80-89 AND fit >= 70
- * REVIEW: resume 70-79 (optional; hidden by default in UI)
- * HIDE: < 70 or fails gates
+ * Recalibrated for keyword-based matcher (JDs often shorter than resume).
+ * APPLY_NOW: resume >= 80 AND fit >= 80
+ * STRONG_FIT: resume >= 70 AND fit >= 75
+ * NEAR_MATCH: resume >= 60 AND fit >= 65
+ * REVIEW: resume >= 50
+ * HIDE: < 50 or fails gates
  */
 export function computeBucket(resumeMatch: number, finalFitScore: number): Bucket {
-  if (resumeMatch >= 95 && finalFitScore >= 85) return "APPLY_NOW";
-  if (resumeMatch >= 90 && resumeMatch <= 94 && finalFitScore >= 80) return "STRONG_FIT";
-  if (resumeMatch >= 80 && resumeMatch <= 89 && finalFitScore >= 70) return "NEAR_MATCH";
-  if (resumeMatch >= 70 && resumeMatch <= 79) return "REVIEW";
+  if (resumeMatch >= 80 && finalFitScore >= 80) return "APPLY_NOW";
+  if (resumeMatch >= 70 && finalFitScore >= 75) return "STRONG_FIT";
+  if (resumeMatch >= 60 && finalFitScore >= 65) return "NEAR_MATCH";
+  if (resumeMatch >= 50) return "REVIEW";
   return "HIDE";
 }
 

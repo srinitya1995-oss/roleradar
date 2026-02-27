@@ -1,7 +1,9 @@
 /**
  * Pre-scoring gating. Only ingest Senior/Principal PM, PM-T, TPM roles. No PMM, no program/project manager.
- * GATE 0: Hard title exclusion → GATE 1: Must be PM (product manager / PM-T / technical product) → GATE 2: Seniority → GATE 3: Location → GATE 4: Description sanity.
+ * GATE 0: Hard title exclusion → GATE 1: Must be PM → GATE 2: Seniority → GATE 3: Location → GATE 4: Description sanity.
+ * Gate 4: PM-T/Technical Product Manager titles bypass the eng-keyword penalty; strategy/roadmap use normalized text.
  */
+import { normalizeForMatch } from "@/src/lib/normalize";
 
 /** GATE 0 — If title contains ANY of these (case-insensitive), discard. Do NOT store. Excludes non-PM roles; "tpm" removed so Technical Product Manager is allowed. */
 export const GATE0_HARD_TITLE_EXCLUSION = [
@@ -60,7 +62,7 @@ export const GATE1_PM_TITLE = [
 /** GATE 2 — Title must contain one of these (seniority): Senior, Sr, Principal, Staff. */
 export const GATE2_SENIORITY = ["senior", "sr.", "sr ", "principal", "staff"];
 
-/** GATE 4 — If description has > this many eng-keyword hits AND no strategy/roadmap, discard. */
+/** GATE 4 — If description has > this many eng-keyword hits AND no strategy/roadmap, discard. PM-T/TPM titles bypass. */
 const GATE4_ENG_KEYWORDS = [
   "code",
   "coding",
@@ -71,11 +73,22 @@ const GATE4_ENG_KEYWORDS = [
   "debugging",
 ];
 const GATE4_ENG_THRESHOLD = 5;
-const GATE4_STRATEGY_TERMS = ["product strategy", "roadmap"];
+/** Strategy/roadmap checked via normalized text so "Product Strategy" and "Roadmap" aren't missed. */
+const GATE4_STRATEGY_TERMS_NORMALIZED = ["product strategy", "roadmap"];
 
 function titleContainsAny(title: string | null | undefined, terms: string[]): boolean {
   const t = (title ?? "").toLowerCase();
   return terms.some((kw) => t.includes(kw.toLowerCase()));
+}
+
+/** True if title is PM-T or Technical Product Manager (bypasses Gate 4 eng-keyword penalty). */
+function isTechnicalPmTitle(title: string | null | undefined): boolean {
+  const norm = normalizeForMatch(title ?? "");
+  return (
+    norm.includes("technical product manager") ||
+    norm.includes("pm-t") ||
+    norm.includes("pmt ")
+  );
 }
 
 function countOccurrences(text: string, terms: string[]): number {
@@ -89,9 +102,9 @@ function countOccurrences(text: string, terms: string[]): number {
   return count;
 }
 
-function descriptionContainsAny(description: string | null | undefined, terms: string[]): boolean {
-  const d = (description ?? "").toLowerCase();
-  return terms.some((t) => d.includes(t.toLowerCase()));
+function descriptionContainsStrategyNormalized(description: string | null | undefined): boolean {
+  const norm = normalizeForMatch(description ?? "");
+  return GATE4_STRATEGY_TERMS_NORMALIZED.some((t) => norm.includes(normalizeForMatch(t)));
 }
 
 /** GATE 0 — Hard title exclusion. Returns false if title contains any exclusion term (discard). */
@@ -113,12 +126,16 @@ export function passesGate2(title: string | null | undefined): boolean {
 
 /** GATE 3 — Location. Caller uses locationMatchesAllowed(location, allowed_locations). */
 
-/** GATE 4 — Description sanity. Discard if description looks like hands-on eng role (many eng keywords, no strategy/roadmap). */
-export function passesGate4(description: string | null | undefined): boolean {
+/** GATE 4 — Description sanity. Discard if description looks like hands-on eng role (many eng keywords, no strategy/roadmap). Technical PM titles bypass eng penalty. */
+export function passesGate4(
+  title: string | null | undefined,
+  description: string | null | undefined
+): boolean {
   const text = (description ?? "").trim();
   if (!text) return true; // no description → allow (CPI may be null)
+  if (isTechnicalPmTitle(title)) return true; // PM-T / Technical Product Manager: ignore eng-keyword count
   const engCount = countOccurrences(text, GATE4_ENG_KEYWORDS);
-  const hasStrategy = descriptionContainsAny(description, GATE4_STRATEGY_TERMS);
+  const hasStrategy = descriptionContainsStrategyNormalized(description);
   if (engCount > GATE4_ENG_THRESHOLD && !hasStrategy) return false;
   return true;
 }
@@ -137,6 +154,6 @@ export function passesTitleAndDescriptionGates(
   if (!passesGate0(title)) return false;
   if (!passesGate1(title, allowGpm)) return false;
   if (!allowJuniorPm && !passesGate2(title)) return false;
-  if (!passesGate4(description)) return false;
+  if (!passesGate4(title, description)) return false;
   return true;
 }
